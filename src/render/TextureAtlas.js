@@ -966,6 +966,68 @@ const PAINTERS = {
     for (const [kx, ky] of [[4, 10], [7, 11], [10, 10], [6, 13], [9, 13]]) {
       set(kx, ky, rgb(...shade(skin, 1.12)));
     }
+  },
+
+  /**
+   * The arm is built from the 4x12x4 player-model box, and at the scale the
+   * view model puts it on screen one 16px tile stretches across a face that is
+   * twelve model pixels long. A single tile therefore cannot serve every face:
+   * the top and bottom of the box are a four-pixel cross-section while the
+   * sides run the length of the forearm, so the sleeve has to sit where the
+   * shoulder-end cross-section samples and the hand where the wrist-end does.
+   * Three tiles, sampled per face, is what keeps the sleeve on the shoulder and
+   * the skin on the hand.
+   */
+  arm_shoulder: (set, rng) => {
+    // The cut end at the shoulder: cloth only, and darker at the rim.
+    const sleeve = [122, 84, 58];
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const rim = (x === 0 || y === 0 || x === TILE - 1 || y === TILE - 1) ? 0.78 : 1;
+        const weave = 0.94 + rng.next() * 0.12;
+        set(x, y, rgb(...shade(sleeve, rim * weave)));
+      }
+    }
+  },
+
+  arm_end: (set, rng) => {
+    // The cut end at the wrist: the flat of the hand, held slightly lighter
+    // than the sleeve so the two ends of the box never read as the same face.
+    const skin = [214, 166, 130];
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const rim = (x === 0 || y === 0 || x === TILE - 1 || y === TILE - 1) ? 0.8 : 1;
+        const grain = 0.94 + rng.next() * 0.12;
+        set(x, y, rgb(...shade(skin, rim * grain)));
+      }
+    }
+    // Knuckle line across the end of the fist.
+    for (const [kx, ky] of [[4, 6], [7, 5], [10, 7], [5, 11], [9, 10]]) {
+      set(kx, ky, rgb(...shade(skin, 1.1)));
+    }
+  },
+
+  arm_side: (set, rng) => {
+    // The long faces, sampled across the arm's whole 12-pixel length: sleeve at
+    // the shoulder, bare forearm, then the fist. Tone bands as well as colour
+    // so the length of the arm reads even where it is cropped by the frame.
+    const skin = [214, 166, 130];
+    const sleeve = [122, 84, 58];
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const t = y / (TILE - 1);          // 0 = shoulder, 1 = fist
+        let base = skin;
+        if (t < 0.34) base = sleeve;
+        else if (t < 0.42) base = mix(sleeve, skin, (t - 0.34) / 0.08); // cuff
+        // A soft crease down the middle of the forearm, and a knuckle band.
+        let fold = 1;
+        if (Math.abs(x - 7.5) < 1.5 && t >= 0.42 && t < 0.86) fold = 0.88;
+        if (t >= 0.86 && (x % 5 === 1)) fold = 1.1;
+        const edge = (x === 0 || x === TILE - 1) ? 0.88 : 1;
+        const grain = 0.95 + rng.next() * 0.1;
+        set(x, y, rgb(...shade(base, fold * edge * grain)));
+      }
+    }
   }
 };
 

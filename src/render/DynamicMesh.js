@@ -35,6 +35,12 @@ const CUBE_FACES = [
 const _boxCorners = [
   new Float32Array(3), new Float32Array(3), new Float32Array(3), new Float32Array(3)
 ];
+/**
+ * Corner scratch for `addBoxMultiPoints`. Plain arrays of numbers rather than
+ * typed arrays because the transform callback is written by hand and assigning
+ * into a number[] is the least surprising thing to read.
+ */
+const _pointCorners = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
 const _billboardCorners = [
   new Float32Array(3), new Float32Array(3), new Float32Array(3), new Float32Array(3)
 ];
@@ -173,6 +179,35 @@ export class DynamicMesh {
         corners[i][2] = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
       }
       this.addQuad(corners, tileU, tileV, sky, blockLight, face.shade * aoShade, 0);
+    }
+  }
+
+  /**
+   * Push a box from its eight corners, given in the mesh builder's own order.
+   *
+   * The alternative — a 4x4 matrix — is one multiplication convention away from
+   * drawing something subtly wrong, and for the first-person hand it was wrong
+   * twice, both times folding the arm onto its own shoulder because the operand
+   * order was reversed. Corners remove the convention: the caller says where
+   * each point goes and nothing else can be misread.
+   *
+   * @param {Array<{x:number,y:number,z:number}>} corners eight points, indexed
+   *        as in `boxCornerIndex`: bit0 = x, bit1 = y, bit2 = z, each min or max
+   * @param {Array<{u:number,v:number}>} tiles six entries in FACE order
+   * @param {number} sky @param {number} blockLight
+   * @param {number} [aoShade] extra shade multiplier (1 = none)
+   */
+  addBoxMultiCorners(corners, tiles, sky, blockLight, aoShade = 1) {
+    const p = _pointCorners;
+    for (let f = 0; f < 6; f++) {
+      const face = CUBE_FACES[f];
+      for (let i = 0; i < 4; i++) {
+        const c = face.corners[i];
+        // CUBE_FACES uses 0/1 per axis; the corner list is indexed by bit.
+        const corner = corners[(c[0] ? 1 : 0) | (c[1] ? 2 : 0) | (c[2] ? 4 : 0)];
+        p[i][0] = corner.x; p[i][1] = corner.y; p[i][2] = corner.z;
+      }
+      this.addQuad(p, tiles[f].u, tiles[f].v, sky, blockLight, face.shade * aoShade, 0);
     }
   }
 

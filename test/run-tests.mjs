@@ -2107,13 +2107,18 @@ async function main() {
         return { empty, filled, centreEmpty, centreFilled, glError: gl.getError() };
       });
 
-      check('the arm renders even with an empty hand', held.empty.boxes === 2,
+      // The arm is ONE box, not two. It used to be a fist cube plus a separate
+      // forearm slab placed by eye, which could only ever be approximately
+      // joined: that seam is what showed up as a forearm tapering to a wedge and
+      // stopping short of the bottom edge. It is now the 4x12x4 player-model box
+      // from `HandRig`, transformed as a single unit.
+      check('the arm renders even with an empty hand', held.empty.boxes === 1,
         `${held.empty.boxes} boxes (${held.empty.armBoxes} arm)`);
       check('a held stack adds exactly one item box',
         held.filled.boxes === held.empty.boxes + 1 && held.filled.itemBoxes === 1,
         `empty=${held.empty.boxes} filled=${held.filled.boxes} itemBoxes=${held.filled.itemBoxes}`);
       check('the held item mesh has real geometry',
-        held.filled.vertices === 72 && held.filled.indices === 108,
+        held.filled.vertices === 48 && held.filled.indices === 72,
         `vertices=${held.filled.vertices} indices=${held.filled.indices}`);
       check('the held item sits in front of the camera',
         held.filled.bounds !== null && held.filled.bounds.maxZ < 0

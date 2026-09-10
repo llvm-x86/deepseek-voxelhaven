@@ -28,6 +28,7 @@ import { ChunkManager } from './world/ChunkManager.js';
 import { Renderer } from './render/Renderer.js';
 import { EntityRenderer } from './render/EntityRenderer.js';
 import { ParticleSystem } from './render/ParticleSystem.js';
+import { armBoxViewCorners, heldItemBoxCorners } from './render/HandRig.js';
 
 import { Camera } from './player/Camera.js';
 import { Player } from './player/Player.js';
@@ -154,9 +155,7 @@ export class Game {
 
     // Held-item view-space scratch, hoisted out of the per-frame path.
     this._heldSwing = 0;
-    this._heldItemMatrix = new Float32Array(16);
     this._heldFistMatrix = new Float32Array(16);
-    this._heldArmMatrix = new Float32Array(16);
     this._heldArmTiles = [];
     for (let i = 0; i < 6; i++) this._heldArmTiles.push({ u: 0, v: 0 });
     this._heldItemTiles = [];
@@ -1081,96 +1080,100 @@ export class Game {
   }
 
   /**
-   * Build the held-item mesh in view space.
-   * Drawn with the camera's projection only (no view matrix), so the item sits
-   * fixed in front of the camera like a hand.
+   * Build the first-person hand (and whatever it holds) into the held-item
+   * mesh.
    *
-   * The item is anchored to the lower-right corner and partly cropped by the
-   * screen edge, with a forearm rising from the corner to meet it. Without the
-   * arm the item reads as a stray cube floating in the world rather than
-   * something the player is holding, and without the corner anchor it is both
-   * oversized and ambiguous about distance.
+   * Drawn with the camera's projection only (no view matrix of its own), so the
+   * rig sits fixed in front of the camera like a hand. The geometry and the
+   * transform stack both come from `HandRig`, which reproduces the numbers
+   * Minecraft itself uses; see the notes at the top of that file for why this
+   * is not hand-placed in view space.
+   *
+   * The arm is drawn whether or not an item is held: an empty fist still tells
+   * the player where their hand is, and now that the arm is a single connected
+   * box rather than two boxes placed by eye, it reads as an arm either way.
    */
   buildHeldItem(dt) {
     const mesh = this.renderer.heldItemMesh;
     mesh.begin();
 
-    // The arm is drawn whether or not an item is held: an empty fist still
-    // tells the player where their hand is.
     const using = this.input.isDown('break') || this.input.isDown('place');
     this._heldSwing += ((using ? 1 : 0) - this._heldSwing) * Math.min(1, dt * 9);
-    const swing = Math.sin(this._heldSwing * Math.PI) * 0.35;
 
-    // A gentle bob while walking. It moves the WHOLE hand — fist, forearm and
-    // item share one offset — because moving only the item separates it from
-    // the fist it is supposed to be gripped by. At this distance 0.006 view
-    // units is already ~4 px on screen, which was visible as the item sliding
-    // against a stationary arm.
+    // A gentle bob while walking, handed to the rig so it moves the arm and
+    // anything held in it together and they cannot come apart.
     const bob = Math.sin(this.player.walkPhase * 2) * 0.006 * (this.player.onGround ? 1 : 0);
 
-    this.appendHeldArm(mesh, swing, bob);
-
     const stack = this.player.heldStack();
-    if (!stack) return { mesh, projection: this.camera.projection };
+    if (stack) this.appendHeldItem(mesh, stack, this._heldSwing, bob);
 
-    const blockId = ItemRegistry.blockIdOf(stack.item);
-    let tileName;
-    if (blockId !== null) tileName = BlockRegistry.faceTileName(blockId, 0);
-    else tileName = ItemRegistry.tile(stack.item);
-
-    const tileU = this.renderer.atlas.tileU(tileName);
-    const tileV = this.renderer.atlas.tileV(tileName);
-
-    // Same swing delta and bob the arm uses, so the two never separate.
-    const part = HELD_HAND.item;
-    composeViewMatrix(this._heldItemMatrix,
-      part.x + swing * HELD_HAND.swing.x,
-      part.y + swing * HELD_HAND.swing.y + bob,
-      part.z,
-      part.yaw, part.pitch, part.roll,
-      part.size, part.size, part.size);
-
-    const tiles = this._heldItemTiles;
-    for (let i = 0; i < 6; i++) { tiles[i].u = tileU; tiles[i].v = tileV; }
-    mesh.addBoxMulti(this._heldItemMatrix, tiles, 1.0, 0.55, 1.0);
+    // The arm goes in SECOND, deliberately. The held-item pass clears the depth
+    // buffer and draws without sorting, so later geometry wins: putting the arm
+    // last lets the fingers close over the front of whatever is held. Drawing it
+    // first buries the item completely — the arm is the nearer object almost
+    // everywhere they overlap, and a screenshot with a block selected showed a
+    // bare hand and no block at all.
+    this.appendHeldArm(mesh, this._heldSwing, bob);
 
     return { mesh, projection: this.camera.projection };
   }
 
   /**
-   * Append the forearm and fist to the held-item mesh, in view space.
+   * Append the held block or item, if any, to the held-item mesh.
    *
-   * Drawn before the item so the item wins any depth tie at the wrist. Both
-   * boxes are moved by the same rigid swing delta and the same walk bob — see
-   * the notes on `HELD_HAND.swing` and on the bob in `buildHeldItem` for why
-   * these are translations applied to every part rather than per-part motion.
+   * The item is placed by `HandRig` at the fist's own view-space position, so it
+   * is driven by the same rig as the arm and cannot drift out of the hand.
+   *
    * @param {import('./render/DynamicMesh.js').DynamicMesh} mesh
-   * @param {number} swing current swing amount, 0..0.35
+   * @param {{item:string,count:number}} stack
+   * @param {number} swing @param {number} bob pass the same values as the arm
+   */
+  appendHeldItem(mesh, stack, swing, bob) {
+    const blockId = ItemRegistry.blockIdOf(stack.item);
+    let tileName;
+    if (blockId !== null) tileName = BlockRegistry.faceTileName(blockId, 0);
+    else tileName = ItemRegistry.tile(stack.item);
+
+    const tiles = this._heldItemTiles;
+    const tileU = this.renderer.atlas.tileU(tileName);
+    const tileV = this.renderer.atlas.tileV(tileName);
+    for (let i = 0; i < 6; i++) { tiles[i].u = tileU; tiles[i].v = tileV; }
+
+    const corners = heldItemBoxCorners(swing, bob, HELD_ITEM_SIZE);
+    mesh.addBoxMultiCorners(corners, tiles, 1.0, 0.55, 1.0);
+  }
+
+  /**
+   * Append the first-person arm to the held-item mesh.
+   *
+   * One box, not two. The old hand was a fist cube plus a separate forearm
+   * slab, which meant the two could only ever be *approximately* joined, and a
+   * screenshot showed the seam: the forearm tapered to a two-pixel wedge and
+   * ended 79 px above the bottom of the frame. The player-model arm is a single
+   * 4x12x4 box, and so is this.
+   *
+   * @param {import('./render/DynamicMesh.js').DynamicMesh} mesh
+   * @param {number} swing 0..1 swing progress
    * @param {number} bob vertical walk bob, in view units
    */
   appendHeldArm(mesh, swing, bob = 0) {
     const atlas = this.renderer.atlas;
     const tiles = this._heldArmTiles;
-    const armU = atlas.tileU('hand');
-    const armV = atlas.tileV('hand');
-    for (let i = 0; i < 6; i++) { tiles[i].u = armU; tiles[i].v = armV; }
 
-    const dx = swing * HELD_HAND.swing.x;
-    const dy = swing * HELD_HAND.swing.y + bob;
+    // Per-face tiles: the two ends of the box are cross-sections sampled from
+    // the shoulder and the wrist, and the four long faces run the length of the
+    // forearm. Face order is +X, -X, +Y, -Y, +Z, -Z.
+    const shoulderU = atlas.tileU('arm_shoulder'), shoulderV = atlas.tileV('arm_shoulder');
+    const endU = atlas.tileU('arm_end'), endV = atlas.tileV('arm_end');
+    const sideU = atlas.tileU('arm_side'), sideV = atlas.tileV('arm_side');
+    tiles[0].u = sideU; tiles[0].v = sideV;
+    tiles[1].u = sideU; tiles[1].v = sideV;
+    tiles[2].u = shoulderU; tiles[2].v = shoulderV;
+    tiles[3].u = endU; tiles[3].v = endV;
+    tiles[4].u = sideU; tiles[4].v = sideV;
+    tiles[5].u = sideU; tiles[5].v = sideV;
 
-    const forearm = HELD_HAND.forearm;
-    composeViewMatrix(this._heldArmMatrix,
-      forearm.x + dx, forearm.y + dy, forearm.z,
-      forearm.yaw, forearm.pitch, forearm.roll,
-      forearm.sizeXZ, forearm.sizeY, forearm.sizeXZ);
-    mesh.addBoxMulti(this._heldArmMatrix, tiles, 1.0, 0.55, 1.0);
-
-    const fist = HELD_HAND.fist;
-    composeViewMatrix(this._heldArmMatrix,
-      fist.x + dx, fist.y + dy, fist.z,
-      fist.yaw, fist.pitch, fist.roll,
-      fist.size, fist.size, fist.size);
-    mesh.addBoxMulti(this._heldArmMatrix, tiles, 1.0, 0.55, 1.0);
+    mesh.addBoxMultiCorners(armBoxViewCorners(swing, bob), tiles, 1.0, 0.55, 1.0);
   }
 
   // =========================================================================
@@ -1290,74 +1293,13 @@ export class Game {
 const UNDERWATER_FOG = new Float32Array([0.10, 0.28, 0.52]);
 
 /**
- * View-space geometry of the first-person hand.
+ * Edge length of the cube held in the fist, in view units.
  *
- * View space is x right, y up, forward -Z, and the screen edges are at about
- * ±0.66 vertically and ±1.17 horizontally at these depths. Sizes look small but
- * are not: apparent size is `size / |z| / (2 tan(fov/2))`, so the 0.20-unit fist
- * at z = -0.85 already covers 27% of the viewport height.
- *
- * The corner anchor is the whole point. The hand has to be cropped by the right
- * and bottom edges, so it reads as attached to the camera; an earlier version
- * floated entirely inside the frame, ~285 px clear of the right edge and 71 px
- * clear of the bottom, which is what "not on the bottom-right corner at all"
- * described. Both the fist and the forearm therefore extend past the frame.
- *
- * These numbers are not hand-tuned. `test/probe-hand-variants.mjs` sweeps a grid
- * of layouts and scores each against: cropped by both edges, forearm leaving the
- * frame rather than ending in mid-air, no corner crossing the 0.06 near plane,
- * fist near 27% of the viewport height, and the fist and forearm staying rigid
- * through the swing. This layout is the highest-scoring one.
+ * Sized to the fist rather than to the world: the arm's own cross-section is
+ * 4 model pixels, or 0.25 view units at the rig's scale, so an item of this
+ * size reads as being gripped rather than balanced on the knuckles.
  */
-const HELD_HAND = {
-  // The fist: the chunk of hand the player actually sees.
-  fist: { x: 0.966, y: -0.469, z: -0.85, yaw: 0.62, pitch: -0.30, roll: 0.10, size: 0.20 },
-  // The forearm, running down and back out of the bottom-right corner. `sizeY`
-  // is generous so it is cropped by the edge instead of stopping in mid-air.
-  forearm: {
-    x: 1.056, y: -0.989, z: -0.95, yaw: 0.42, pitch: 0.34, roll: 0.10,
-    sizeXZ: 0.18, sizeY: 1.10
-  },
-  // The held item, sitting on top of the fist the way a block does in vanilla —
-  // the same visual weight as the fist itself, not a small token beside it.
-  item: { x: 0.850, y: -0.400, z: -0.80, yaw: 0.62, pitch: -0.30, roll: 0.10, size: 0.20 },
-  /**
-   * The swing is a rigid translation of the whole hand, not a per-part
-   * rotation. Rotating each box about a shared shoulder pivot looks reasonable
-   * but slides the fist and forearm apart — a rotation moves boxes at different
-   * radii by different amounts — which is why the swing moves every part by the
-   * same delta here.
-   */
-  swing: { x: -0.036, y: -0.100 }
-};
-
-/**
- * Compose a view-space (not world-space) transform for the held item.
- * Rotation order is Y then X then Z, matching mat4Compose.
- */
-function composeViewMatrix(out, x, y, z, yaw, pitch, roll, sx, sy, sz) {
-  const cy = Math.cos(yaw), sy_ = Math.sin(yaw);
-  const cp = Math.cos(pitch), sp = Math.sin(pitch);
-  const cr = Math.cos(roll), sr = Math.sin(roll);
-
-  out[0] = (cy * cr + sy_ * sp * sr) * sx;
-  out[1] = (cp * sr) * sx;
-  out[2] = (-sy_ * cr + cy * sp * sr) * sx;
-  out[3] = 0;
-  out[4] = (-cy * sr + sy_ * sp * cr) * sy;
-  out[5] = (cp * cr) * sy;
-  out[6] = (sy_ * sr + cy * sp * cr) * sy;
-  out[7] = 0;
-  out[8] = (sy_ * cp) * sz;
-  out[9] = (-sp) * sz;
-  out[10] = (cy * cp) * sz;
-  out[11] = 0;
-  out[12] = x;
-  out[13] = y;
-  out[14] = z;
-  out[15] = 1;
-  return out;
-}
+const HELD_ITEM_SIZE = 0.10;
 
 /** Human readable description of where worlds are being stored. */
 function storageNote(saveSystem) {
