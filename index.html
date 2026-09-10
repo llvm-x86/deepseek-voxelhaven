@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="color-scheme" content="dark" />
+<title>Voxelhaven</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%234a7d3a'/><rect x='6' y='6' width='20' height='9' fill='%2386c05a'/><rect x='6' y='15' width='20' height='11' fill='%237a5836'/></svg>" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== Game surface ===================== -->
+  <canvas id="game-canvas" aria-label="Voxelhaven world view"></canvas>
+
+  <!-- ===================== Heads-up display ===================== -->
+  <div id="hud" class="layer is-hidden" aria-hidden="true">
+
+    <div id="crosshair" class="crosshair">
+      <span class="crosshair-bar crosshair-h"></span>
+      <span class="crosshair-bar crosshair-v"></span>
+      <div id="break-progress" class="break-progress"><div id="break-progress-fill"></div></div>
+    </div>
+
+    <div id="hud-top-left" class="hud-panel hud-top-left">
+      <div class="hud-world-name" id="hud-world-name">—</div>
+      <div class="hud-world-meta" id="hud-world-meta">—</div>
+    </div>
+
+    <div id="debug-overlay" class="hud-panel debug-overlay is-hidden"></div>
+
+    <div id="hud-toasts" class="toasts"></div>
+
+    <div id="hud-bottom" class="hud-bottom">
+      <div class="vitals">
+        <div id="health-bar" class="health-bar" role="img" aria-label="Health"></div>
+        <div id="breath-bar" class="breath-bar is-hidden" role="img" aria-label="Breath"></div>
+      </div>
+
+      <div id="hotbar" class="hotbar" role="toolbar" aria-label="Hotbar"></div>
+
+      <div id="held-item-name" class="held-item-name"></div>
+      <div class="hud-hint">
+        <kbd>E</kbd> inventory · <kbd>R</kbd> craft · <kbd>F3</kbd> debug · <kbd>Esc</kbd> menu
+      </div>
+    </div>
+
+    <div id="damage-vignette" class="damage-vignette"></div>
+    <div id="water-overlay" class="water-overlay"></div>
+  </div>
+
+  <!-- ===================== Screens ===================== -->
+
+  <section id="screen-boot" class="screen">
+    <div class="panel panel-narrow">
+      <h1 class="logo">Voxelhaven</h1>
+      <p class="subtitle">Preparing the world…</p>
+      <div class="progress-track"><div id="boot-progress" class="progress-fill"></div></div>
+      <p id="boot-message" class="muted small">Starting up</p>
+    </div>
+  </section>
+
+  <section id="screen-menu" class="screen is-hidden">
+    <div class="panel">
+      <h1 class="logo">Voxelhaven</h1>
+      <p class="subtitle">A small voxel survival sandbox</p>
+      <div class="button-column">
+        <button id="btn-new-world" class="btn btn-primary" type="button">Create New World</button>
+        <button id="btn-load-world" class="btn" type="button">Load World</button>
+        <button id="btn-controls" class="btn" type="button">Controls</button>
+      </div>
+      <p class="muted small center" id="menu-storage-note">Checking storage…</p>
+    </div>
+  </section>
+
+  <section id="screen-controls" class="screen is-hidden">
+    <div class="panel">
+      <h2>Controls</h2>
+      <div class="controls-grid">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Move</div>
+        <div><kbd>Space</kbd></div><div>Jump / swim up</div>
+        <div><kbd>Shift</kbd></div><div>Sprint</div>
+        <div><kbd>Ctrl</kbd> / <kbd>C</kbd></div><div>Crouch</div>
+        <div><kbd>Mouse</kbd></div><div>Look around</div>
+        <div><kbd>Left click</kbd></div><div>Break block / attack</div>
+        <div><kbd>Right click</kbd></div><div>Place block</div>
+        <div><kbd>Middle click</kbd></div><div>Pick block into hotbar</div>
+        <div><kbd>Q</kbd></div><div>Drop one item</div>
+        <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Wheel</kbd></div><div>Select hotbar slot</div>
+        <div><kbd>E</kbd> / <kbd>Tab</kbd></div><div>Inventory</div>
+        <div><kbd>R</kbd></div><div>Crafting</div>
+        <div><kbd>F3</kbd> / <kbd>`</kbd></div><div>Debug overlay</div>
+        <div><kbd>M</kbd></div><div>Mute audio</div>
+        <div><kbd>Esc</kbd></div><div>Pause menu</div>
+      </div>
+      <p class="muted small">Click the world to capture the mouse. Press Escape to release it.</p>
+      <div class="button-row">
+        <button id="btn-controls-back" class="btn" type="button">Back</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-worlds" class="screen is-hidden">
+    <div class="panel">
+      <h2>Load World</h2>
+      <div id="world-list" class="world-list"></div>
+      <div class="button-row">
+        <button id="btn-worlds-back" class="btn" type="button">Back</button>
+      </div>
+      <p class="muted small" id="worlds-storage-note"></p>
+    </div>
+  </section>
+
+  <section id="screen-create" class="screen is-hidden">
+    <div class="panel">
+      <h2>Create New World</h2>
+      <form id="create-form" class="form" autocomplete="off">
+        <label class="field">
+          <span>World name</span>
+          <input id="input-world-name" type="text" maxlength="40" placeholder="My World" required />
+        </label>
+        <label class="field">
+          <span>Seed</span>
+          <input id="input-world-seed" type="text" maxlength="24" placeholder="leave blank for a random seed" />
+        </label>
+        <label class="field checkbox">
+          <input id="input-peaceful" type="checkbox" />
+          <span>Peaceful mode (no hostile mobs)</span>
+        </label>
+        <p class="muted small">
+          The same seed always generates the same terrain. Worlds are stored on disk by the
+          Voxelhaven server, with browser storage as a fallback.
+        </p>
+        <div class="button-row">
+          <button type="button" id="btn-create-back" class="btn">Back</button>
+          <button type="submit" class="btn btn-primary">Create &amp; Play</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="screen-loading" class="screen is-hidden">
+    <div class="panel panel-narrow">
+      <h2 id="loading-title">Generating world…</h2>
+      <div class="progress-track"><div id="loading-progress" class="progress-fill"></div></div>
+      <p id="loading-message" class="muted small">Building terrain around the spawn point</p>
+    </div>
+  </section>
+
+  <section id="screen-pause" class="screen is-hidden">
+    <div class="panel panel-narrow">
+      <h2>Paused</h2>
+      <p class="muted small" id="pause-world-meta">—</p>
+      <div class="button-column">
+        <button id="btn-resume" class="btn btn-primary" type="button">Resume</button>
+        <button id="btn-save" class="btn" type="button">Save World</button>
+        <button id="btn-settings" class="btn" type="button">Settings</button>
+        <button id="btn-quit" class="btn btn-danger" type="button">Save &amp; Quit to Menu</button>
+      </div>
+      <p class="muted small center" id="pause-status"></p>
+    </div>
+  </section>
+
+  <section id="screen-settings" class="screen is-hidden">
+    <div class="panel">
+      <h2>Settings</h2>
+      <div class="form">
+        <label class="field">
+          <span>Render distance: <b id="setting-render-distance-value">8</b> chunks</span>
+          <input id="setting-render-distance" type="range" min="3" max="14" step="1" value="8" />
+        </label>
+        <label class="field">
+          <span>Mouse sensitivity: <b id="setting-sensitivity-value">1.0</b>×</span>
+          <input id="setting-sensitivity" type="range" min="0.2" max="3" step="0.1" value="1" />
+        </label>
+        <label class="field">
+          <span>Field of view: <b id="setting-fov-value">72</b>°</span>
+          <input id="setting-fov" type="range" min="50" max="110" step="1" value="72" />
+        </label>
+        <label class="field">
+          <span>Day length: <b id="setting-day-length-value">10</b> min</span>
+          <input id="setting-day-length" type="range" min="1" max="40" step="1" value="10" />
+        </label>
+        <label class="field">
+          <span>Master volume: <b id="setting-volume-value">50</b>%</span>
+          <input id="setting-volume" type="range" min="0" max="100" step="1" value="50" />
+        </label>
+        <label class="field checkbox">
+          <input id="setting-muted" type="checkbox" />
+          <span>Mute all audio</span>
+        </label>
+        <label class="field checkbox">
+          <input id="setting-invert-y" type="checkbox" />
+          <span>Invert vertical look</span>
+        </label>
+      </div>
+      <div class="button-row">
+        <button id="btn-settings-back" class="btn btn-primary" type="button">Done</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-inventory" class="screen screen-dim is-hidden">
+    <div class="panel panel-wide">
+      <div class="inventory-layout">
+        <div class="inventory-main">
+          <h2>Inventory</h2>
+          <div class="inventory-section">
+            <div class="section-label">Backpack</div>
+            <div id="inventory-grid" class="slot-grid"></div>
+          </div>
+          <div class="inventory-section">
+            <div class="section-label">Hotbar</div>
+            <div id="inventory-hotbar" class="slot-grid slot-grid-hotbar"></div>
+          </div>
+          <p class="muted small">Click a slot to pick a stack up, click another to place it. Shift-click to split.</p>
+        </div>
+        <div class="inventory-side">
+          <h2>Craft</h2>
+          <div id="craft-list" class="craft-list"></div>
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="btn-inventory-close" class="btn btn-primary" type="button">Close (E)</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-death" class="screen screen-death is-hidden">
+    <div class="panel panel-narrow">
+      <h2 class="death-title">You died</h2>
+      <p id="death-cause" class="muted">Cause of death</p>
+      <div class="button-column">
+        <button id="btn-respawn" class="btn btn-primary" type="button">Respawn</button>
+        <button id="btn-death-quit" class="btn" type="button">Quit to Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-error" class="screen is-hidden">
+    <div class="panel">
+      <h2 class="error-title">Something went wrong</h2>
+      <p id="error-message" class="error-message">—</p>
+      <pre id="error-detail" class="error-detail"></pre>
+      <div class="button-row">
+        <button id="btn-error-reload" class="btn btn-primary" type="button">Reload</button>
+        <button id="btn-error-menu" class="btn" type="button">Back to menu</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<noscript>
+  <div class="noscript">Voxelhaven needs JavaScript and WebGL2 to run.</div>
+</noscript>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

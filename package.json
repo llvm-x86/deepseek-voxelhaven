@@ -1,0 +1,27 @@
+{
+  "name": "voxelhaven",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Voxelhaven - a complete browser-based voxel survival sandbox built on vanilla ES modules and WebGL2. Zero runtime dependencies.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js --port 8080",
+    "test": "node test/run-tests.mjs",
+    "test:headed": "node test/run-tests.mjs --headed"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "voxel",
+    "webgl2",
+    "sandbox",
+    "game"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "puppeteer-core": "^25.10.0"
+  }
+}

@@ -1,0 +1,13 @@
+# Node dependencies are only used by the automated test harness.
+# The game itself has no runtime dependencies.
+node_modules/
+
+# World saves written by the server (each player's worlds are their own).
+saves/*.json
+
+# Test artefacts.
+test/screenshots/
+
+# Editor and OS noise.
+.DS_Store
+*.log
