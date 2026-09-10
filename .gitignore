@@ -1,6 +1,6 @@
 # Node dependencies are only used by the automated test harness.
 # The game itself has no runtime dependencies.
-node_modules/
+node_modules
 
 # World saves written by the server (each player's worlds are their own).
 saves/*.json
@@ -11,3 +11,7 @@ test/screenshots/
 # Editor and OS noise.
 .DS_Store
 *.log
+
+# Raw Wiki HTML is a re-fetchable scraper cache, not a build input.
+# tools/cache/crafting-corpus.json is committed and is what build-recipes.mjs reads.
+tools/cache/wiki/

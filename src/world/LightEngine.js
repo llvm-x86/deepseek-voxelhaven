@@ -177,6 +177,14 @@ export class LightEngine {
       const nz = cz + (dir === 2 ? -1 : dir === 3 ? 1 : 0);
       const neighbour = world.getChunk(nx, nz);
       if (!neighbour || neighbour.state < ChunkState.LIT) continue;
+      // A neighbour that is itself queued for a light recompute still holds
+      // values from before the edit. Importing them would bake a ghost of a
+      // light source that has already been removed into this chunk, and the
+      // ghost survives every later pass because this chunk is no longer dirty.
+      // The neighbour offers its light again — through the `lightPropagated`
+      // re-import pass — as soon as it is clean, so skipping it here is both
+      // safe and what makes removing a light source converge to zero.
+      if (neighbour.lightDirty) continue;
 
       for (let i = 0; i < CHUNK_SIZE; i++) {
         for (let y = 0; y < WORLD_HEIGHT; y++) {

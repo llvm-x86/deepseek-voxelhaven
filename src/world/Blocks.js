@@ -36,7 +36,19 @@ export const BlockId = Object.freeze({
   GLOWCAP: 17,
   CACTUS: 18,
   BRAMBLE: 19,
-  BLOOM: 20
+  BLOOM: 20,
+  // Ids from here on were appended when the crafting system landed. Never
+  // reorder or renumber: chunk data and save files store the numeric id.
+  CRAFTING_TABLE: 21,
+  FURNACE: 22,
+  IRON_ORE: 23,
+  TORCH: 24,
+  COAL_BLOCK: 25,
+  IRON_BLOCK: 26,
+  STONE_BRICKS: 27,
+  CUT_SANDSTONE: 28,
+  SMOOTH_STONE: 29,
+  SMOOTH_SANDSTONE: 30
 });
 
 /** Number of bytes available for block ids in a chunk. */
@@ -81,6 +93,9 @@ export const FACE_OPPOSITE = [1, 0, 3, 2, 5, 4];
  * @property {{item:string, min:number, max:number}} drops what breaking yields
  * @property {string} sound              audio group: stone|dirt|grass|wood|sand|glass|liquid|plant
  * @property {boolean} [plant]           decorative, breaks instantly, no collision
+ * @property {'pickaxe'|'axe'|'shovel'|'none'} [tool] preferred tool family
+ * @property {number} [tier]             minimum tool tier that yields a drop:
+ *                                       0 = bare hand, 1 = wood, 2 = stone, 3 = iron
  */
 
 /**
@@ -96,6 +111,7 @@ const BLOCK_LIST = [
   },
   {
     id: 1, key: 'turf', name: 'Turf',
+    tool: 'shovel', tier: 0,
     solid: true, opaque: true,
     hardness: 0.65, sound: 'grass',
     // Top is grass, bottom is dirt, sides are the grass/dirt blend.
@@ -104,6 +120,7 @@ const BLOCK_LIST = [
   },
   {
     id: 2, key: 'loam', name: 'Loam',
+    tool: 'shovel', tier: 0,
     solid: true, opaque: true,
     hardness: 0.55, sound: 'dirt',
     textures: ['loam', 'loam', 'loam', 'loam', 'loam', 'loam'],
@@ -111,6 +128,7 @@ const BLOCK_LIST = [
   },
   {
     id: 3, key: 'stone', name: 'Stone',
+    tool: 'pickaxe', tier: 1,
     solid: true, opaque: true,
     hardness: 1.6, sound: 'stone',
     textures: ['stone', 'stone', 'stone', 'stone', 'stone', 'stone'],
@@ -118,6 +136,7 @@ const BLOCK_LIST = [
   },
   {
     id: 4, key: 'cobble', name: 'Cobblestone',
+    tool: 'pickaxe', tier: 1,
     solid: true, opaque: true,
     hardness: 1.5, sound: 'stone',
     textures: ['cobble', 'cobble', 'cobble', 'cobble', 'cobble', 'cobble'],
@@ -125,6 +144,7 @@ const BLOCK_LIST = [
   },
   {
     id: 5, key: 'sand', name: 'Sand',
+    tool: 'shovel', tier: 0,
     solid: true, opaque: true,
     hardness: 0.5, sound: 'sand',
     textures: ['sand', 'sand', 'sand', 'sand', 'sand', 'sand'],
@@ -132,6 +152,7 @@ const BLOCK_LIST = [
   },
   {
     id: 6, key: 'sandstone', name: 'Sandstone',
+    tool: 'pickaxe', tier: 1,
     solid: true, opaque: true,
     hardness: 1.2, sound: 'stone',
     textures: ['sandstone_side', 'sandstone_side', 'sandstone_top', 'sandstone_top', 'sandstone_side', 'sandstone_side'],
@@ -139,6 +160,7 @@ const BLOCK_LIST = [
   },
   {
     id: 7, key: 'gravel', name: 'Gravel',
+    tool: 'shovel', tier: 0,
     solid: true, opaque: true,
     hardness: 0.6, sound: 'sand',
     textures: ['gravel', 'gravel', 'gravel', 'gravel', 'gravel', 'gravel'],
@@ -146,6 +168,7 @@ const BLOCK_LIST = [
   },
   {
     id: 8, key: 'snow', name: 'Snow Block',
+    tool: 'shovel', tier: 0,
     solid: true, opaque: true,
     hardness: 0.35, sound: 'sand',
     textures: ['snow', 'snow', 'snow', 'snow', 'snow', 'snow'],
@@ -153,6 +176,7 @@ const BLOCK_LIST = [
   },
   {
     id: 9, key: 'timber', name: 'Timber',
+    tool: 'axe', tier: 0,
     solid: true, opaque: true,
     hardness: 1.1, sound: 'wood',
     textures: ['timber_side', 'timber_side', 'timber_top', 'timber_top', 'timber_side', 'timber_side'],
@@ -167,6 +191,7 @@ const BLOCK_LIST = [
   },
   {
     id: 11, key: 'planks', name: 'Planks',
+    tool: 'axe', tier: 0,
     solid: true, opaque: true,
     hardness: 1.0, sound: 'wood',
     textures: ['planks', 'planks', 'planks', 'planks', 'planks', 'planks'],
@@ -182,6 +207,7 @@ const BLOCK_LIST = [
   },
   {
     id: 13, key: 'coal_ore', name: 'Coal Ore',
+    tool: 'pickaxe', tier: 1,
     solid: true, opaque: true,
     hardness: 1.9, sound: 'stone',
     textures: ['coal_ore', 'coal_ore', 'coal_ore', 'coal_ore', 'coal_ore', 'coal_ore'],
@@ -203,6 +229,7 @@ const BLOCK_LIST = [
   },
   {
     id: 16, key: 'lantern', name: 'Lantern',
+    tool: 'pickaxe', tier: 0,
     solid: true, opaque: true, emissive: true, emission: 14,
     hardness: 0.7, sound: 'glass',
     textures: ['lantern', 'lantern', 'lantern', 'lantern', 'lantern', 'lantern'],
@@ -235,6 +262,99 @@ const BLOCK_LIST = [
     hardness: 0.05, sound: 'plant',
     textures: ['bloom', 'bloom', 'bloom', 'bloom', 'bloom', 'bloom'],
     drops: { item: 'bloom', min: 1, max: 1 }
+  },
+  {
+    // Opens the 3x3 crafting screen when used (see Interaction.tryUse).
+    id: 21, key: 'crafting_table', name: 'Crafting Table',
+    tool: 'axe', tier: 0,
+    solid: true, opaque: true,
+    hardness: 1.0, sound: 'wood',
+    textures: [
+      'crafting_table_side', 'crafting_table_side', 'crafting_table_top', 'planks',
+      'crafting_table_side', 'crafting_table_side'
+    ],
+    drops: { item: 'crafting_table', min: 1, max: 1 }
+  },
+  {
+    // Opens the smelting screen when used. The "front" face carries the mouth.
+    id: 22, key: 'furnace', name: 'Furnace',
+    tool: 'pickaxe', tier: 1,
+    solid: true, opaque: true,
+    hardness: 1.8, sound: 'stone',
+    textures: ['furnace_side', 'furnace_side', 'furnace_top', 'furnace_top', 'furnace_front', 'furnace_side'],
+    drops: { item: 'furnace', min: 1, max: 1 }
+  },
+  {
+    // The only ore that needs better than a wooden pickaxe, which is what
+    // makes the stone -> iron step of the progression meaningful.
+    id: 23, key: 'iron_ore', name: 'Iron Ore',
+    tool: 'pickaxe', tier: 2,
+    solid: true, opaque: true,
+    hardness: 2.2, sound: 'stone',
+    textures: ['iron_ore', 'iron_ore', 'iron_ore', 'iron_ore', 'iron_ore', 'iron_ore'],
+    drops: { item: 'iron_ore', min: 1, max: 1 }
+  },
+  {
+    // A crossed-billboard light source, like the other plants. Cheaper than a
+    // lantern, which is what makes caves explorable early.
+    id: 24, key: 'torch', name: 'Torch',
+    solid: false, opaque: false, plant: true, replaceable: true, targetable: true,
+    emissive: true, emission: 12,
+    hardness: 0.05, sound: 'wood',
+    textures: ['torch', 'torch', 'torch', 'torch', 'torch', 'torch'],
+    drops: { item: 'torch', min: 1, max: 1 }
+  },
+  {
+    id: 25, key: 'coal_block', name: 'Block of Coal',
+    tool: 'pickaxe', tier: 1,
+    solid: true, opaque: true,
+    hardness: 2.5, sound: 'stone',
+    textures: ['coal_block', 'coal_block', 'coal_block', 'coal_block', 'coal_block', 'coal_block'],
+    drops: { item: 'coal_block', min: 1, max: 1 }
+  },
+  {
+    id: 26, key: 'iron_block', name: 'Block of Iron',
+    tool: 'pickaxe', tier: 2,
+    solid: true, opaque: true,
+    hardness: 2.8, sound: 'stone',
+    textures: ['iron_block', 'iron_block', 'iron_block', 'iron_block', 'iron_block', 'iron_block'],
+    drops: { item: 'iron_block', min: 1, max: 1 }
+  },
+  {
+    id: 27, key: 'stone_bricks', name: 'Stone Bricks',
+    tool: 'pickaxe', tier: 1,
+    solid: true, opaque: true,
+    hardness: 1.6, sound: 'stone',
+    textures: ['stone_bricks', 'stone_bricks', 'stone_bricks', 'stone_bricks', 'stone_bricks', 'stone_bricks'],
+    drops: { item: 'stone_bricks', min: 1, max: 1 }
+  },
+  {
+    id: 28, key: 'cut_sandstone', name: 'Cut Sandstone',
+    tool: 'pickaxe', tier: 1,
+    solid: true, opaque: true,
+    hardness: 1.2, sound: 'stone',
+    // The cut faces are smooth; only the top keeps the sedimentary banding.
+    textures: ['cut_sandstone', 'cut_sandstone', 'sandstone_top', 'sandstone_top', 'cut_sandstone', 'cut_sandstone'],
+    drops: { item: 'cut_sandstone', min: 1, max: 1 }
+  },
+  {
+    id: 29, key: 'smooth_stone', name: 'Smooth Stone',
+    tool: 'pickaxe', tier: 1,
+    solid: true, opaque: true,
+    hardness: 1.6, sound: 'stone',
+    textures: ['smooth_stone', 'smooth_stone', 'smooth_stone', 'smooth_stone', 'smooth_stone', 'smooth_stone'],
+    drops: { item: 'smooth_stone', min: 1, max: 1 }
+  },
+  {
+    id: 30, key: 'smooth_sandstone', name: 'Smooth Sandstone',
+    tool: 'pickaxe', tier: 1,
+    solid: true, opaque: true,
+    hardness: 1.2, sound: 'stone',
+    textures: [
+      'smooth_sandstone', 'smooth_sandstone', 'smooth_sandstone', 'smooth_sandstone',
+      'smooth_sandstone', 'smooth_sandstone'
+    ],
+    drops: { item: 'smooth_sandstone', min: 1, max: 1 }
   }
 ];
 
@@ -259,6 +379,8 @@ for (const def of BLOCK_LIST) {
   def.emission = def.emission || 0;
   def.attenuation = def.attenuation || 0;
   def.plant = def.plant === true;
+  def.tool = def.tool || 'none';
+  def.tier = def.tier || 0;
   if (!Array.isArray(def.textures) || def.textures.length !== 6) {
     throw new Error(`[Blocks] block "${def.key}" must declare exactly 6 face textures`);
   }
@@ -287,6 +409,15 @@ export const EMISSION = new Uint8Array(BLOCK_ID_LIMIT);
 export const ATTENUATION = new Uint8Array(BLOCK_ID_LIMIT);
 /** 1 when the block can be hit by the interaction raycast. */
 export const TARGETABLE = new Uint8Array(BLOCK_ID_LIMIT);
+/** Minimum tool tier that yields a drop, per block id. */
+export const MIN_TIER = new Uint8Array(BLOCK_ID_LIMIT);
+
+/**
+ * Tool family each block belongs to, encoded as the character code of the
+ * first letter ('p'ickaxe, 'a'xe, 's'hovel) so the hot path can stay on typed
+ * arrays. 0 means "no preferred tool".
+ */
+export const TOOL_FAMILY = new Uint8Array(BLOCK_ID_LIMIT);
 
 for (const def of BLOCK_LIST) {
   SOLID[def.id] = def.solid ? 1 : 0;
@@ -298,6 +429,8 @@ for (const def of BLOCK_LIST) {
   EMISSION[def.id] = def.emission;
   ATTENUATION[def.id] = def.attenuation;
   TARGETABLE[def.id] = def.targetable ? 1 : 0;
+  MIN_TIER[def.id] = def.tier;
+  TOOL_FAMILY[def.id] = def.tool === 'none' ? 0 : def.tool.charCodeAt(0);
 }
 
 // Pre-resolve each block's six face tile *names* into a flat array of strings
@@ -374,6 +507,30 @@ export const BlockRegistry = {
   isTargetable(id) { return TARGETABLE[id] === 1; },
   /** True for blocks that are completely invisible (air). */
   isAir(id) { return id === 0; },
+
+  /** Preferred tool family for a block: 'pickaxe' | 'axe' | 'shovel' | 'none'. */
+  tool(id) {
+    const code = TOOL_FAMILY[id] || 0;
+    if (code === 0) return 'none';
+    return code === 112 ? 'pickaxe' : code === 97 ? 'axe' : code === 115 ? 'shovel' : 'none';
+  },
+
+  /** Minimum tool tier that yields a drop for this block (0 = bare hands). */
+  tier(id) { return MIN_TIER[id] || 0; },
+
+  /**
+   * True when a tool of this family and tier can harvest the block, i.e. make
+   * it drop. Bare hands always harvest tier-0 blocks.
+   *
+   * @param {number} id block id
+   * @param {'pickaxe'|'axe'|'shovel'|'none'} tool
+   * @param {number} tier 0 = hand, 1 = wood, 2 = stone, 3 = iron
+   */
+  canHarvest(id, tool, tier) {
+    const needed = MIN_TIER[id] || 0;
+    if (needed === 0) return true;
+    return BlockRegistry.tool(id) === tool && tier >= needed;
+  },
 
   /**
    * Texture tile name for one face of one block.

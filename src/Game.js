@@ -40,10 +40,13 @@ import { TimeSystem } from './systems/TimeSystem.js';
 import { Input } from './systems/Input.js';
 import { AudioSystem } from './systems/AudioSystem.js';
 import { SaveSystem } from './systems/SaveSystem.js';
+import { Smelting } from './systems/Smelting.js';
+import { RecipeBook } from './data/RecipeBook.js';
 
 import { HUD } from './ui/HUD.js';
 import { Menus } from './ui/Menus.js';
 import { InventoryUI } from './ui/InventoryUI.js';
+import { FurnaceUI } from './ui/FurnaceUI.js';
 
 import { GameState, isWorldIdleState } from './GameState.js';
 import { DEBUG } from './core/Config.js';
@@ -92,6 +95,12 @@ export class Game {
     // ---- UI ---------------------------------------------------------------
     this.hud = new HUD(bus, this.renderer.atlas);
     this.inventoryUI = new InventoryUI(bus, this.renderer.atlas, this.audio);
+    this.smelting = new Smelting(bus);
+    this.furnaceUI = new FurnaceUI(bus, this.renderer.atlas, this.audio, this.smelting);
+    // Stacks that do not fit back into the inventory when a screen closes are
+    // dropped into the world rather than deleted.
+    this.inventoryUI.onOverflow = (stack) => this.dropOverflow(stack);
+    this.furnaceUI.setOverflowHandler((stack) => this.dropOverflow(stack));
     this.menus = new Menus(bus, this.saveSystem, {
       onCreateWorld: (options) => this.createWorld(options),
       onLoadWorld: (id) => this.loadWorld(id),
@@ -126,6 +135,10 @@ export class Game {
     this.peaceful = false;
     this.playTimeSeconds = 0;
     this.autosaveTimer = 0;
+    /** Which container screen is open: null, 'inventory', 'crafting_table' or 'furnace'. */
+    this.activeScreen = null;
+    /** Position of the station behind the open container screen, if any. */
+    this.activeStation = null;
     /** Spawn position chosen at world creation, used by the loading screen. */
     this.pendingSpawn = null;
 
@@ -139,9 +152,7 @@ export class Game {
     this._fpsFrames = 0;
     this.underwaterAmount = 0;
 
-    // Held-item scratch: reused every frame so building the view-space hand and
-    // item allocates nothing. One matrix per box, plus the per-face tile origin
-    // list that DynamicMesh.addBoxMulti consumes.
+    // Held-item view-space scratch, hoisted out of the per-frame path.
     this._heldSwing = 0;
     this._heldItemMatrix = new Float32Array(16);
     this._heldFistMatrix = new Float32Array(16);
@@ -195,6 +206,14 @@ export class Game {
       if (!locked && this.state === GameState.PLAYING) this.pause();
     });
     this.bus.on('requestCloseInventory', () => this.closeInventory());
+    this.bus.on('requestCloseFurnace', () => this.closeInventory());
+    this.bus.on('openCraftingTable', ({ x, y, z }) => this.openCraftingTable(x, y, z));
+    this.bus.on('openFurnace', ({ x, y, z }) => this.openFurnace(x, y, z));
+    this.bus.on('toolBroke', ({ item }) => {
+      this.hud.toast(`Your ${ItemRegistry.name(item)} broke`, 'warn', 3);
+      this.hud.refreshHotbar(this.player);
+    });
+    this.bus.on('toolDamaged', () => this.hud.refreshHotbar(this.player));
     this.bus.on('craftFailed', ({ reason }) => this.hud.toast(reason, 'warn'));
     this.bus.on('saveWarnings', (warnings) => {
       for (const warning of warnings) this.hud.toast(warning, 'warn', 5);
@@ -243,6 +262,10 @@ export class Game {
     this.menus.setBootProgress(0.4, 'Generating textures');
     await nextFrame();
 
+    this.menus.setBootProgress(0.6, 'Loading recipes');
+    await this.loadRecipes();
+    await nextFrame();
+
     this.menus.setBootProgress(0.7, 'Checking world storage');
     await this.saveSystem.probe();
     this.menus.setStorageNote(storageNote(this.saveSystem));
@@ -259,6 +282,22 @@ export class Game {
     }
     resolveBooted();
     this.startLoop();
+  }
+
+  /**
+   * Fetch and index the vendored recipe snapshot.
+   *
+   * A failure here must not stop the game: without recipes the world is still
+   * playable, so the error is surfaced through a toast and `RecipeBook.error`
+   * rather than being thrown. The test suite asserts the book is non-empty.
+   */
+  async loadRecipes() {
+    try {
+      return await RecipeBook.load();
+    } catch (err) {
+      console.error('[Game] could not load the recipe book:', err);
+      return RecipeBook.fail(err);
+    }
   }
 
   // =========================================================================
@@ -337,6 +376,7 @@ export class Game {
       }
 
       const entityResult = this.entityManager.deserialize(document.entities);
+      const furnaceResult = this.smelting.deserialize(document.furnaces);
 
       this.pendingSpawn = { x: this.player.x, y: this.player.y, z: this.player.z };
 
@@ -348,6 +388,9 @@ export class Game {
       for (const warning of playerWarnings) this.hud.toast(warning, 'warn', 5);
       if (entityResult.skipped > 0) {
         this.hud.toast(`${entityResult.skipped} item drop(s) could not be restored`, 'warn', 5);
+      }
+      if (furnaceResult.skipped > 0) {
+        this.hud.toast(`${furnaceResult.skipped} furnace(s) could not be restored`, 'warn', 5);
       }
 
       this.beginLoading('Loading terrain', 'Rebuilding chunks from the world seed');
@@ -381,6 +424,10 @@ export class Game {
       this.world, this.player, this.camera,
       this.entityManager, this.particles, this.audio, this.bus
     );
+    // A broken furnace must spill its contents instead of deleting them.
+    this.interaction.onFurnaceBroken = (x, y, z) => this.spillFurnace(x, y, z);
+
+    this.smelting.clear();
 
     this.timeSystem = new TimeSystem(this.bus, TIME.startTime);
     this.timeSystem.dayLengthSeconds = this.menus.settings.dayLengthMinutes * 60;
@@ -477,7 +524,12 @@ export class Game {
     this.renderer.clearWorld();
     if (this.world) this.world.clear();
     if (this.entityManager) this.entityManager.clear();
+    if (this.smelting) this.smelting.clear();
     this.particles.clear();
+    this.inventoryUI.close();
+    this.furnaceUI.close();
+    this.activeScreen = null;
+    this.activeStation = null;
     this.chunkManager = null;
     this.world = null;
     this.player = null;
@@ -526,19 +578,55 @@ export class Game {
 
   /** Open the inventory / crafting screen. */
   openInventory() {
+    // Switching between container screens is allowed: close the old one first.
+    if (this.state === GameState.INVENTORY) this.closeInventory();
     if (this.state !== GameState.PLAYING) return;
     this.state = GameState.INVENTORY;
+    this.activeScreen = 'inventory';
     this.input.enabled = false;
     this.input.exitPointerLock();
     if (this.playerController) this.playerController.frozen = true;
     this.hud.hide();
-    this.inventoryUI.open(this.player);
+    this.inventoryUI.open(this.player, { station: 'inventory' });
   }
 
-  /** Close the inventory screen. */
+  /** Open the 3x3 crafting screen for a placed crafting table. */
+  openCraftingTable(x = 0, y = 0, z = 0) {
+    if (this.state === GameState.INVENTORY) this.closeInventory();
+    if (this.state !== GameState.PLAYING) return;
+    this.state = GameState.INVENTORY;
+    this.activeScreen = 'crafting_table';
+    this.activeStation = { x, y, z };
+    this.input.enabled = false;
+    this.input.exitPointerLock();
+    if (this.playerController) this.playerController.frozen = true;
+    this.hud.hide();
+    this.inventoryUI.open(this.player, { station: 'crafting_table' });
+    this.audio.play('click');
+  }
+
+  /** Open the smelting screen for a placed furnace. */
+  openFurnace(x, y, z) {
+    if (this.state === GameState.INVENTORY) this.closeInventory();
+    if (this.state !== GameState.PLAYING) return;
+    this.state = GameState.INVENTORY;
+    this.activeScreen = 'furnace';
+    this.activeStation = { x, y, z };
+    this.input.enabled = false;
+    this.input.exitPointerLock();
+    if (this.playerController) this.playerController.frozen = true;
+    this.hud.hide();
+    this.furnaceUI.open(this.player, x, y, z);
+    this.audio.play('click');
+  }
+
+  /** Close whichever container screen is open. */
   closeInventory() {
     if (this.state !== GameState.INVENTORY) return;
-    this.inventoryUI.close();
+    if (this.activeScreen === 'furnace') this.furnaceUI.close();
+    else this.inventoryUI.close();
+    this.activeScreen = null;
+    this.activeStation = null;
     this.state = GameState.PLAYING;
     this.menus.show(null);
     this.hud.show();
@@ -546,6 +634,32 @@ export class Game {
     this.input.enabled = true;
     this.input.requestPointerLock();
     if (this.playerController) this.playerController.frozen = false;
+  }
+
+  /**
+   * Empty a furnace into the world when its block is destroyed.
+   * @returns {number} how many stacks were dropped
+   */
+  spillFurnace(x, y, z) {
+    const station = this.smelting.get(x, y, z);
+    if (!station) return 0;
+    let dropped = 0;
+    for (const slot of ['input', 'fuel', 'output']) {
+      const stack = station[slot];
+      if (!stack || stack.count <= 0) continue;
+      this.entityManager.spawnItem(x + 0.5, y + 0.5, z + 0.5, stack.item, stack.count);
+      station[slot] = null;
+      dropped++;
+    }
+    this.smelting.remove(x, y, z);
+    return dropped;
+  }
+
+  /** Drop a stack that would not fit anywhere else, just above the player. */
+  dropOverflow(stack) {
+    if (!stack || !this.player || !this.entityManager) return;
+    this.entityManager.spawnItem(this.player.x, this.player.y + 0.8, this.player.z, stack.item, stack.count);
+    this.hud.toast(`${ItemRegistry.name(stack.item)} ×${stack.count} dropped`, 'info', 3);
   }
 
   /** Respawn the player at their spawn point. */
@@ -596,6 +710,7 @@ export class Game {
       player: this.player.serialize(),
       edits: this.world.serializeEdits(),
       entities: this.entityManager.serialize(),
+      furnaces: this.smelting.serialize(),
       stats: {
         playTimeMs: Math.round(this.playTimeSeconds * 1000),
         blocksBroken: this.player.blocksBroken,
@@ -845,6 +960,9 @@ export class Game {
     });
     this.entityManager.updateSpawning(dt, this.player, this.timeSystem.getEnvironment().dayBrightness);
 
+    // Furnaces keep smelting whether or not their screen is open.
+    this.smelting.update(dt);
+
     // Survival: drowning and slow regeneration.
     this.updateSurvival(dt);
 
@@ -1089,6 +1207,8 @@ export class Game {
       ['Particles', String(this.particles.liveCount)],
       ['Memory', `${(world.memoryFootprint() / 1048576).toFixed(1)} MB voxels · ${(this.renderer.chunkRenderer.stats.gpuBytes / 1048576).toFixed(1)} MB GPU`],
       ['Edits', String(world.stats.edits)],
+      ['Recipes', `${this.recipeBook().recipes.length} known · ${this.recipeBook().smelting.length} smelting`],
+      ['Furnaces', String(this.smelting ? this.smelting.stations.size : 0)],
       ['Target', this.interaction && this.interaction.target
         ? `${BlockRegistry.get(this.interaction.target.id).name} @ ${this.interaction.target.x},${this.interaction.target.y},${this.interaction.target.z}`
         : 'none'],
@@ -1133,13 +1253,20 @@ export class Game {
     }
   }
 
-  /**
-   * Change the render distance at runtime (used by the settings screen and by
+  /** Change the render distance at runtime (used by the settings screen and by
    * the automated tests, which run on a software renderer and want a small world).
    */
   setRenderDistance(chunks) {
     this.menus.settings.renderDistance = chunks;
     if (this.chunkManager) this.chunkManager.setRenderDistance(chunks);
+  }
+
+  /**
+   * The active recipe book. Always returns a usable (possibly empty) book, so
+   * callers never have to null-check before boot finishes.
+   */
+  recipeBook() {
+    return RecipeBook.current();
   }
 
   /** Resize handling for the canvas. */

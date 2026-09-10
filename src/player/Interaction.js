@@ -20,8 +20,12 @@ import { ItemRegistry } from '../world/Items.js';
 import { pickBlock } from '../world/Raycast.js';
 import { INTERACTION, PLAYER } from '../core/Config.js';
 
-/** How long a break must be held before the block is destroyed, per hardness. */
-const BREAK_SPEED = 1.0;
+/**
+ * Extra time a block takes when the tool in hand cannot harvest it, and when
+ * nothing suitable is held at all. Matching the "wrong tool is slow, and the
+ * wrong tier yields nothing" rule is what makes tool tiers mean something.
+ */
+const WRONG_TOOL_PENALTY = 4.0;
 
 export class Interaction {
   /**
@@ -56,6 +60,12 @@ export class Interaction {
     this.instantBreak = false;
     /** Reach in blocks. */
     this.reach = PLAYER.reach;
+    /**
+     * Hook invoked when a furnace is broken, so the smelting system can spill
+     * its contents into the world instead of losing them. Set by Game.
+     * @type {((x:number,y:number,z:number)=>void)|null}
+     */
+    this.onFurnaceBroken = null;
   }
 
   /**
@@ -110,7 +120,7 @@ export class Interaction {
 
     if (wantsPlace) {
       if (input.wasPressed('place') || this.placeRepeatTimer <= 0) {
-        if (this.tryPlace()) this.placeRepeatTimer = INTERACTION.repeatPlaceDelay;
+        if (this.tryUse()) this.placeRepeatTimer = INTERACTION.repeatPlaceDelay;
       }
     }
 
@@ -147,7 +157,7 @@ export class Interaction {
       return;
     }
 
-    this.breakProgress += (dt * BREAK_SPEED) / hardness;
+    this.breakProgress += (dt * this.breakSpeedFor(target.id)) / hardness;
     if (this.breakProgress >= 1) {
       this.breakBlock(target.x, target.y, target.z);
       this.breakProgress = 0;
@@ -157,27 +167,123 @@ export class Interaction {
   }
 
   /**
+   * How fast the held item breaks this block.
+   *
+   * The right tool family at the right tier is fast; anything else is slowed
+   * down, which is the visible half of the tier system (the other half is that
+   * an unharvestable block simply does not drop).
+   *
+   * @param {number} blockId
+   * @returns {number} speed multiplier, 1 = by hand
+   */
+  breakSpeedFor(blockId) {
+    const tool = this.player.heldTool();
+    const family = BlockRegistry.tool(blockId);
+    if (!tool) return family === 'none' ? 1 : 1 / WRONG_TOOL_PENALTY;
+    if (family === 'none' || family !== tool.type) return 1 / WRONG_TOOL_PENALTY;
+    if (!BlockRegistry.canHarvest(blockId, tool.type, tool.tier)) return tool.speed / WRONG_TOOL_PENALTY;
+    return tool.speed;
+  }
+
+  /**
    * Destroy a block, spawn its drop and emit feedback.
    * @returns {boolean} true when a block was removed
    */
   breakBlock(x, y, z) {
     const previous = this.world.getBlock(x, y, z);
     if (previous === BlockId.AIR || BlockRegistry.isUnbreakable(previous)) return false;
+
+    // The tool decides whether anything is yielded at all: stone without a
+    // pickaxe of the right tier breaks, but drops nothing.
+    const tool = this.player.heldTool();
+    const harvestable = BlockRegistry.canHarvest(
+      previous,
+      tool ? tool.type : 'none',
+      tool ? tool.tier : 0
+    );
+
     if (!this.world.setBlock(x, y, z, BlockId.AIR)) return false;
 
-    // Drop the block's item.
-    const drop = BlockRegistry.drops(previous);
-    if (drop && drop.item && drop.item !== 'air') {
-      const count = drop.min + Math.floor(Math.random() * (drop.max - drop.min + 1));
-      if (count > 0) {
-        this.entities.spawnItem(x + 0.5, y + 0.35, z + 0.5, drop.item, count);
+    if (harvestable) {
+      const drop = BlockRegistry.drops(previous);
+      if (drop && drop.item && drop.item !== 'air') {
+        const count = drop.min + Math.floor(Math.random() * (drop.max - drop.min + 1));
+        if (count > 0) {
+          this.entities.spawnItem(x + 0.5, y + 0.35, z + 0.5, drop.item, count);
+        }
+      }
+    }
+
+    // A furnace keeps its contents in the smelting system; breaking it has to
+    // spill them into the world rather than delete them.
+    if (previous === BlockId.FURNACE && this.onFurnaceBroken) {
+      this.onFurnaceBroken(x, y, z);
+    }
+
+    // Tools wear out, but only on blocks that actually took effort.
+    if (tool && BlockRegistry.hardness(previous) > 0) {
+      if (this.player.damageHeldTool(1)) {
+        this.bus.emit('toolBroke', { item: tool.type });
       }
     }
 
     this.particles.spawnBlockBreak(x, y, z, previous, 14);
     this.audio.playBlockSound('break', BlockRegistry.sound(previous));
     this.player.blocksBroken++;
-    this.bus.emit('blockBroken', { x, y, z, id: previous });
+    this.bus.emit('blockBroken', { x, y, z, id: previous, harvestable });
+    return true;
+  }
+
+  /**
+   * Right-click: use whatever is in hand on whatever is being aimed at.
+   *
+   * Order matters. Using a station (crafting table, furnace) and filling a
+   * bucket take priority over placing a block, because those are what the
+   * player means when they right-click a workstation while holding planks.
+   *
+   * @returns {boolean} true when something happened
+   */
+  tryUse() {
+    const target = this.target;
+    if (!target) return false;
+
+    if (target.id === BlockId.CRAFTING_TABLE) {
+      this.bus.emit('openCraftingTable', { x: target.x, y: target.y, z: target.z });
+      return true;
+    }
+    if (target.id === BlockId.FURNACE) {
+      this.bus.emit('openFurnace', { x: target.x, y: target.y, z: target.z });
+      return true;
+    }
+    if (this.tryFillBucket()) return true;
+    return this.tryPlace();
+  }
+
+  /**
+   * Scoop water with an empty bucket. Water is not targetable by the normal
+   * raycast, so this casts its own ray that also stops on water.
+   * @returns {boolean} true when the bucket was filled
+   */
+  tryFillBucket() {
+    const stack = this.player.heldStack();
+    if (!stack || stack.item !== 'bucket') return false;
+    const hit = pickBlock(
+      this.world, this.camera, this.reach,
+      (id) => BlockRegistry.isTargetable(id) || id === BlockId.WATER
+    );
+    if (!hit || hit.id !== BlockId.WATER) return false;
+
+    // One bucket in, one filled bucket out. The full bucket does not stack, so
+    // it needs a slot of its own.
+    this.player.inventory.removeAt(this.player.selectedSlot, 1);
+    const leftover = this.player.inventory.add('water_bucket', 1);
+    if (leftover > 0) {
+      this.player.inventory.add('bucket', 1);
+      return false;
+    }
+    this.audio.play('pickup');
+    this.bus.emit('bucketFilled', { x: hit.x, y: hit.y, z: hit.z });
+    this.bus.emit('hotbarRefresh');
     return true;
   }
 
@@ -293,10 +399,13 @@ export class Interaction {
     if (blockHit) return false;
 
     const mob = hit.entity;
-    mob.hurt(4, { world: this.world, bus: this.bus, entities: this.entities, player: this.player }, true);
+    const damage = this.player.attackDamage();
+    mob.hurt(damage, { world: this.world, bus: this.bus, entities: this.entities, player: this.player }, true);
     this.particles.spawnMobHit(mob.x, mob.y + mob.height * 0.6, mob.z, 8);
     this.audio.play('hit');
-    this.bus.emit('playerAttacked', { entity: mob, damage: 4 });
+    // Swinging a tool at a mob wears it out, exactly as mining does.
+    if (this.player.heldTool()) this.player.damageHeldTool(1);
+    this.bus.emit('playerAttacked', { entity: mob, damage });
     return true;
   }
 

@@ -9,6 +9,7 @@
 
 import { PLAYER } from '../core/Config.js';
 import { Inventory } from './Inventory.js';
+import { ItemRegistry } from '../world/Items.js';
 
 export class Player {
   /**
@@ -151,6 +152,43 @@ export class Player {
   /** The item stack in the currently selected hotbar slot, or null. */
   heldStack() {
     return this.inventory.get(this.selectedSlot);
+  }
+
+  /**
+   * Tool behaviour of the held item, or null when it is not a tool.
+   * @returns {import('../world/Items.js').ToolStats|null}
+   */
+  heldTool() {
+    const stack = this.heldStack();
+    return stack ? ItemRegistry.tool(stack.item) : null;
+  }
+
+  /**
+   * Spend uses of the held tool, breaking it when its durability runs out.
+   * @param {number} amount
+   * @returns {boolean} true when the tool broke on this use
+   */
+  damageHeldTool(amount = 1) {
+    const stack = this.heldStack();
+    if (!stack) return false;
+    const max = ItemRegistry.durability(stack.item);
+    if (max <= 0) return false;
+    const current = stack.durability === undefined ? max : stack.durability;
+    const next = current - amount;
+    if (next <= 0) {
+      this.inventory.set(this.selectedSlot, null);
+      this.bus.emit('toolBroke', { item: stack.item, slot: this.selectedSlot });
+      return true;
+    }
+    stack.durability = next;
+    this.bus.emit('toolDamaged', { item: stack.item, durability: next, max });
+    return false;
+  }
+
+  /** Attack damage of the held item, in half-hearts (1 for a bare fist). */
+  attackDamage() {
+    const tool = this.heldTool();
+    return tool ? tool.damage : 1;
   }
 
   /**

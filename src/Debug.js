@@ -15,6 +15,7 @@ import { BlockRegistry } from './world/Blocks.js';
 import { boxIntersectsWorld } from './player/Physics.js';
 import { ItemRegistry } from './world/Items.js';
 import { GameState } from './GameState.js';
+import { Crafting } from './systems/Crafting.js';
 
 /**
  * Attach the debug helpers to a Game instance.
@@ -75,6 +76,21 @@ export function installDebugApi(game) {
         await new Promise((r) => setTimeout(r, 60));
       }
       throw new Error(`debug.waitForState timed out; state is "${game.state}", wanted ${list.join('|')}`);
+    },
+
+    /**
+     * Make sure the session is back in play.
+     *
+     * Releasing the pointer lock pauses the game, and a browser raises that
+     * event asynchronously — so a script that closes a screen and immediately
+     * drives movement can find itself paused. This resumes if needed.
+     *
+     * @returns {string} the state afterwards
+     */
+    ensurePlaying() {
+      if (game.state === GameState.PAUSED) game.resume();
+      else if (game.state === GameState.INVENTORY) game.closeInventory();
+      return game.state;
     },
 
     /** Wait until the chunk streaming queue is empty. */
@@ -212,6 +228,246 @@ export function installDebugApi(game) {
     },
 
     /**
+     * Right-click whatever is being aimed at: use a crafting table, a furnace
+     * or a bucket, and fall back to placing a block. The normal frame loop
+     * goes through `tryUse()` too, so this is the same path a player takes.
+     */
+    useAtTarget() {
+      game.interaction.refreshTarget();
+      return game.interaction.tryUse();
+    },
+
+    // ---------------------------------------------------------------------
+    // Crafting
+    // ---------------------------------------------------------------------
+
+    /**
+     * Lay a grid out from a compact description, for tests and the console.
+     *
+     *   setCraftGrid([['planks', 'planks'], ['planks', 'planks']])
+     *   setCraftGrid([[null, 'stick'], [null, 'stick']])
+     *
+     * Accepts a 2x2 or 3x3 array (or a flat array of size*size). Entries are
+     * item keys, `{item, count}` objects, or null. It also opens the inventory
+     * screen so the recipe browsers and result slot are live.
+     *
+     * @param {Array} rows
+     * @param {{station?:'inventory'|'crafting_table', open?:boolean}} [options]
+     */
+    setCraftGrid(rows, options = {}) {
+      const station = options.station === 'crafting_table' ? 'crafting_table' : 'inventory';
+      const dimension = station === 'crafting_table' ? 3 : 2;
+      const flat = Array.isArray(rows[0]) ? rows.flat() : rows.slice();
+      if (flat.length > dimension * dimension) {
+        throw new Error(`setCraftGrid expects at most ${dimension * dimension} slots for a ${dimension}x${dimension} grid`);
+      }
+      if (options.open !== false) {
+        if (game.state === 'inventory') game.closeInventory();
+        if (station === 'crafting_table') game.openCraftingTable();
+        else game.openInventory();
+      } else if (!game.inventoryUI.isOpen) {
+        game.openInventory();
+      }
+      if (game.inventoryUI.station !== station) {
+        game.inventoryUI.close();
+        if (station === 'crafting_table') game.openCraftingTable();
+        else game.openInventory();
+      }
+      const grid = game.inventoryUI.grid;
+      grid.resize(dimension);
+      for (let i = 0; i < flat.length; i++) {
+        const entry = flat[i];
+        if (!entry) continue;
+        grid.set(i, typeof entry === 'string' ? { item: entry, count: 1 } : { item: entry.item, count: entry.count || 1 });
+      }
+      game.inventoryUI.refresh();
+      return grid.serialize();
+    },
+
+    /** The recipe the current crafting grid satisfies, or null. */
+    getCraftResult() {
+      const match = game.inventoryUI.match;
+      if (!match) return null;
+      return {
+        id: match.recipe.id,
+        name: match.recipe.name,
+        output: match.output,
+        mirrored: match.mirrored,
+        slots: match.slots.map((slot) => ({ index: slot.index, symbol: slot.symbol, consume: slot.consume }))
+      };
+    },
+
+    /** Click the result slot: one craft, or as many as possible. */
+    takeCraftResult(many = false) {
+      game.inventoryUI.takeResult(many);
+      return api.snapshot();
+    },
+
+    /** Lay a recipe out in the grid straight from the inventory. */
+    layOutRecipe(id) {
+      const recipe = Crafting.byId(id);
+      if (!recipe) return false;
+      return game.inventoryUI.fillFromInventory(recipe);
+    },
+
+    /** The current crafting grid contents. */
+    getCraftGrid() {
+      return game.inventoryUI.grid.serialize();
+    },
+
+    /** The stack currently held by the cursor in an open container screen. */
+    getHeldStack() {
+      const held = game.inventoryUI.isOpen
+        ? game.inventoryUI.slots.held
+        : game.furnaceUI.isOpen ? game.furnaceUI.slots.held : null;
+      return held ? { item: held.item, count: held.count } : null;
+    },
+
+    /** Every recipe in the loaded book, summarised. */
+    recipes() {
+      const book = game.recipeBook();
+      return book.recipes.map((recipe) => ({
+        id: recipe.id,
+        name: recipe.name,
+        type: recipe.type,
+        station: recipe.station,
+        output: recipe.output,
+        origin: recipe.origin
+      }));
+    },
+
+    /** Aggregate counts of the loaded recipe book. */
+    recipeStats() {
+      return game.recipeBook().stats();
+    },
+
+    /** Recipes that produce an item. */
+    recipesFor(item) {
+      return game.recipeBook().byOutput(item).map((recipe) => recipe.id);
+    },
+
+    // ---------------------------------------------------------------------
+    // Container screens
+    // ---------------------------------------------------------------------
+
+    /** Open a container screen without needing a placed block. */
+    openScreen(which = 'inventory') {
+      if (which === 'crafting_table') game.openCraftingTable();
+      else if (which === 'furnace') {
+        const position = game.activeStation || {
+          x: Math.floor(game.player.x),
+          y: Math.floor(game.player.y) - 1,
+          z: Math.floor(game.player.z)
+        };
+        game.openFurnace(position.x, position.y, position.z);
+      } else game.openInventory();
+      return game.state;
+    },
+
+    /** Close whichever container screen is open. */
+    closeScreen() {
+      game.closeInventory();
+      return game.state;
+    },
+
+    /** Which container screen is showing. */
+    activeScreen() {
+      return {
+        state: game.state,
+        screen: game.activeScreen,
+        station: game.inventoryUI.isOpen ? game.inventoryUI.station : null,
+        gridSize: game.inventoryUI.grid.size
+      };
+    },
+
+    // ---------------------------------------------------------------------
+    // Furnaces
+    // ---------------------------------------------------------------------
+
+    /** The furnace at a position, as plain data. */
+    getFurnace(x, y, z) {
+      const station = game.smelting.get(x, y, z);
+      if (!station) return null;
+      return {
+        input: station.input,
+        fuel: station.fuel,
+        output: station.output,
+        lit: station.lit,
+        heat: Number(game.smelting.heatOf(station).toFixed(3)),
+        progress: Number(game.smelting.progressOf(station).toFixed(3))
+      };
+    },
+
+    /** Load a furnace by hand, the way shift-clicking would. */
+    fillFurnace(x, y, z, { input = null, fuel = null } = {}) {
+      if (input) game.smelting.insertInput(x, y, z, input);
+      if (fuel) game.smelting.insertFuel(x, y, z, fuel);
+      game.furnaceUI.refresh();
+      return api.getFurnace(x, y, z);
+    },
+
+    /** Take everything out of a furnace's result slot. */
+    takeFurnaceOutput(x, y, z) {
+      const stack = game.smelting.takeOutput(x, y, z);
+      if (stack) game.player.inventory.add(stack.item, stack.count);
+      game.furnaceUI.refresh();
+      return stack;
+    },
+
+    // ---------------------------------------------------------------------
+    // Inventory helpers
+    // ---------------------------------------------------------------------
+
+    /** Overwrite an inventory slot (used to set up specific situations). */
+    setInventorySlot(index, item, count = 1) {
+      game.player.inventory.set(index, item ? { item, count } : null);
+      game.hud.refreshHotbar(game.player);
+      if (game.inventoryUI.isOpen) game.inventoryUI.refresh();
+      return game.player.inventory.serialize();
+    },
+
+    /** Remove everything from the inventory. */
+    clearInventory() {
+      game.player.inventory.clear();
+      game.hud.refreshHotbar(game.player);
+      if (game.inventoryUI.isOpen) game.inventoryUI.refresh();
+      return game.player.inventory.serialize();
+    },
+
+    /**
+     * Select the hotbar slot holding an item, swapping it into the hotbar when
+     * it is in the backpack, so a test can use it without knowing where the
+     * inventory happened to put it.
+     *
+     * @param {string} item
+     * @returns {number} the selected hotbar index, or -1 when the item is absent
+     */
+    selectItem(item) {
+      const inventory = game.player.inventory;
+      const index = inventory.slots.findIndex((slot) => slot && slot.item === item);
+      if (index < 0) return -1;
+      if (index < 9) {
+        game.player.selectHotbar(index);
+        return index;
+      }
+      // Swap it into the currently selected hotbar slot and select that.
+      const target = game.player.selectedSlot;
+      inventory.moveStack(index, target);
+      game.player.selectHotbar(target);
+      game.hud.refreshHotbar(game.player);
+      return target;
+    },
+
+    /** Durability remaining on the stack in a slot, or null. */
+    durabilityOf(index) {
+      const stack = game.player.inventory.get(index);
+      if (!stack) return null;
+      const max = ItemRegistry.durability(stack.item);
+      if (max <= 0) return null;
+      return { item: stack.item, durability: stack.durability === undefined ? max : stack.durability, max };
+    },
+
+    /**
      * Spawn a mob at an exact position. Unlike spawnMobNear this ignores the
      * natural-spawn distance rules, which makes it usable inside a test arena.
      */
@@ -250,20 +506,13 @@ export function installDebugApi(game) {
       return game.timeSystem.getEnvironment().dayBrightness;
     },
 
-    /** Change the render distance (used by tests to keep runs short). */
-    setRenderDistance(chunks) {
-      game.setRenderDistance(chunks);
-      return game.chunkManager ? game.chunkManager.renderDistance : chunks;
-    },
-
     /**
      * Measure the view-space held-item mesh for the current frame.
      *
      * The mesh always contains the arm boxes, so the item's contribution is
      * derived by comparison: with a stack selected there is exactly one more
      * box than with the slot empty. Tests use this to prove the arm renders
-     * even when the hand is empty, and that the item adds geometry only when
-     * something is actually held.
+     * even with an empty hand.
      */
     heldMeshStats() {
       const mesh = game.renderer.heldItemMesh;
@@ -300,6 +549,12 @@ export function installDebugApi(game) {
       };
     },
 
+    /** Change the render distance (used by tests to keep runs short). */
+    setRenderDistance(chunks) {
+      game.setRenderDistance(chunks);
+      return game.chunkManager ? game.chunkManager.renderDistance : chunks;
+    },
+
     /** Change the day length in seconds. */
     setDayLength(seconds) {
       game.timeSystem.dayLengthSeconds = seconds;
@@ -312,16 +567,58 @@ export function installDebugApi(game) {
     /**
      * Press or release a logical action without touching the DOM.
      * Actions are the names used by Input (forward, jump, break, place, ...).
+     *
+     * A rising edge also emits the same `keyAction` event the DOM handler
+     * emits, so menu toggles (inventory, pause, hotbar) can be driven from an
+     * automated test through exactly the same path a key press takes.
      */
     setAction(action, down) {
       if (down) {
-        if (!game.input.down.has(action)) game.input.pressed.add(action);
+        if (!game.input.down.has(action)) {
+          game.input.pressed.add(action);
+          game.bus.emit('keyAction', action);
+        }
         game.input.down.add(action);
       } else {
         game.input.down.delete(action);
         game.input.released.add(action);
       }
       return [...game.input.down];
+    },
+
+    /**
+     * Find the closest block of a kind within a radius of the player, using
+     * the already-loaded chunks. Returns null when there is none nearby.
+     *
+     * @param {string} key block key, e.g. 'timber'
+     * @param {number} [radius] in blocks
+     */
+    findBlockNear(key, radius = 24) {
+      const def = BlockRegistry.byKey(key);
+      if (!def) throw new Error(`unknown block key "${key}"`);
+      const world = game.world;
+      const px = Math.floor(game.player.x);
+      const py = Math.floor(game.player.y);
+      const pz = Math.floor(game.player.z);
+      let best = null;
+      let bestDistance = Infinity;
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dz = -radius; dz <= radius; dz++) {
+          for (let dy = -8; dy <= 8; dy++) {
+            const x = px + dx;
+            const y = py + dy;
+            const z = pz + dz;
+            if (y < 0 || y > 127) continue;
+            if (world.getBlock(x, y, z) !== def.id) continue;
+            const distance = Math.hypot(dx, dy, dz);
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              best = { x, y, z, distance: round(distance) };
+            }
+          }
+        }
+      }
+      return best;
     },
 
     /** True while the action is considered held. */
@@ -370,6 +667,10 @@ export function installDebugApi(game) {
           blocksPlaced: player.blocksPlaced
         },
         inventory: player.inventory.serialize(),
+        craftGrid: game_.inventoryUI ? game_.inventoryUI.grid.serialize() : [],
+        craftResult: game_.inventoryUI && game_.inventoryUI.match
+          ? { id: game_.inventoryUI.match.recipe.id, output: game_.inventoryUI.match.output }
+          : null,
         chunks: game_.world ? game_.world.chunkCount : 0,
         pendingChunks: game_.chunkManager ? game_.chunkManager.pendingChunks : -1,
         entities: game_.entityManager ? game_.entityManager.count : 0,

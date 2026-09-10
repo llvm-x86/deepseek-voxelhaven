@@ -73,8 +73,101 @@ const PALETTE = {
   cactusDark: [56, 104, 50],
   flowerPink: [226, 120, 168],
   flowerYellow: [240, 214, 96],
-  fiber: [176, 200, 110]
+  fiber: [176, 200, 110],
+  iron: [214, 214, 218],
+  ironDark: [156, 158, 166],
+  ironLight: [242, 242, 246],
+  ironOre: [206, 168, 138],
+  coalBlock: [38, 38, 44],
+  torchFlame: [255, 196, 96],
+  brick: [148, 148, 150]
 };
+
+/**
+ * Tool materials: base, dark and light shading for the head of each tier.
+ * Wooden heads reuse the plank palette, stone the cobble palette and iron the
+ * metal palette, so tools read as being made of the thing they were crafted
+ * from.
+ */
+const TOOL_MATERIALS = {
+  1: { base: [172, 136, 88], dark: [124, 96, 60], light: [202, 166, 112] },
+  2: { base: [136, 136, 138], dark: [96, 96, 100], light: [178, 178, 180] },
+  3: { base: [214, 214, 218], dark: [150, 152, 160], light: [246, 246, 250] }
+};
+
+/**
+ * Draw a tool icon: a wooden haft running bottom-left to top-right with a
+ * head shape for the tool family. Parameterised rather than hand-painted
+ * twelve times so every tier stays visually consistent.
+ *
+ * @param {(x:number,y:number,c:number[]|null)=>void} set
+ * @param {import('../core/Random.js').Random} rng
+ * @param {'pickaxe'|'axe'|'shovel'|'sword'} type
+ * @param {number} tier
+ */
+function paintTool(set, rng, type, tier) {
+  const material = TOOL_MATERIALS[tier] || TOOL_MATERIALS[1];
+  for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) set(x, y, null);
+
+  const shadePixel = (x, y, base) => {
+    const n = rng.next();
+    set(x, y, rgb(...mix(base, [0, 0, 0], n * 0.28)));
+  };
+
+  // Haft: a two-pixel-wide diagonal from the bottom-left grip to the head.
+  const haftFrom = type === 'sword' ? [5, 12] : [3, 13];
+  const haftTo = type === 'sword' ? [8, 9] : [10, 6];
+  const steps = Math.max(Math.abs(haftTo[0] - haftFrom[0]), Math.abs(haftTo[1] - haftFrom[1]));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = Math.round(haftFrom[0] + (haftTo[0] - haftFrom[0]) * t);
+    const y = Math.round(haftFrom[1] + (haftTo[1] - haftFrom[1]) * t);
+    shadePixel(x, y, PALETTE.bark);
+    shadePixel(x + 1, y, PALETTE.barkDark);
+  }
+
+  if (type === 'pickaxe') {
+    // A shallow arc: the head sweeps from the upper left across to the right.
+    for (let x = 6; x <= 13; x++) {
+      const drop = Math.round(Math.abs(x - 9.5) * 0.45);
+      const y = 4 + drop;
+      shadePixel(x, y, material.base);
+      shadePixel(x, y + 1, material.dark);
+      if (x >= 8 && x <= 11) shadePixel(x, y - 1, material.light);
+    }
+  } else if (type === 'axe') {
+    // A blade on the left of the haft with a bright cutting edge.
+    for (let y = 2; y <= 8; y++) {
+      const width = y <= 5 ? 5 : 4;
+      for (let x = 6; x <= 6 + width; x++) {
+        shadePixel(x, y, x === 6 ? material.light : material.base);
+      }
+    }
+    for (let y = 3; y <= 7; y++) set(6, y, rgb(...material.light));
+  } else if (type === 'shovel') {
+    // A rounded scoop sitting on the end of the haft.
+    for (let y = 2; y <= 7; y++) {
+      for (let x = 8; x <= 13; x++) {
+        const edge = Math.hypot((x - 10.5) / 3, (y - 4.5) / 3.2);
+        if (edge > 1) continue;
+        shadePixel(x, y, edge > 0.75 ? material.dark : material.base);
+      }
+    }
+  } else {
+    // Sword: a straight bright blade with a crossguard across the grip.
+    for (let i = 0; i <= 8; i++) {
+      const x = 7 + i;
+      const y = 9 - i;
+      shadePixel(x, y, material.base);
+      shadePixel(x, y - 1, material.light);
+      shadePixel(x + 1, y, material.dark);
+    }
+    for (let i = -2; i <= 2; i++) shadePixel(6 + i, 12 + i, PALETTE.woodDark);
+    shadePixel(12, 3, material.light);
+    shadePixel(13, 3, material.light);
+    shadePixel(12, 2, material.light);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Tile painters
@@ -549,6 +642,307 @@ const PAINTERS = {
       }
     }
   },
+
+  // -------------------------------------------------------------------------
+  // Crafting-system blocks
+  // -------------------------------------------------------------------------
+
+  /** Crafting table top: the familiar 3x3 grid carved into a plank surface. */
+  crafting_table_top: (set, rng) => {
+    PAINTERS.planks(set, rng);
+    for (let i = 1; i <= 3; i++) {
+      const at = i * 4 - 1;
+      for (let x = 1; x < TILE - 1; x++) set(x, at, rgb(...shade(PALETTE.woodDark, 0.55)));
+      for (let y = 1; y < TILE - 1; y++) set(at, y, rgb(...shade(PALETTE.woodDark, 0.55)));
+    }
+    // A light bevel around the border so the grid reads as recessed.
+    for (let x = 0; x < TILE; x++) {
+      set(x, 0, rgb(...shade(PALETTE.wood, 0.7)));
+      set(x, TILE - 1, rgb(...shade(PALETTE.woodDark, 0.75)));
+    }
+  },
+
+  /** Crafting table side: planks with a saw and a hammer resting on top. */
+  crafting_table_side: (set, rng) => {
+    PAINTERS.planks(set, rng);
+    // Tool rack: a saw blade on the left, a hammer head on the right.
+    for (let y = 3; y <= 6; y++) {
+      for (let x = 1; x <= 6; x++) set(x, y, rgb(...mix([196, 198, 204], [140, 142, 150], rng.next() * 0.5)));
+    }
+    for (let i = 0; i < 4; i++) set(1 + i, 7, rgb(...PALETTE.woodDark));
+    for (let y = 3; y <= 5; y++) {
+      for (let x = 9; x <= 13; x++) set(x, y, rgb(...mix([176, 142, 96], [128, 100, 64], rng.next())));
+    }
+    for (let y = 6; y <= 9; y++) set(11, y, rgb(...PALETTE.woodDark));
+  },
+
+  furnace_top: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const n = rng.next();
+        set(x, y, rgb(...mix(PALETTE.stone, PALETTE.stoneDark, n * 0.6)));
+      }
+    }
+    // A ring of rougher stone around a recessed centre.
+    for (let y = 4; y < 12; y++) {
+      for (let x = 4; x < 12; x++) {
+        const edge = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
+        if (edge > 3.4) continue;
+        set(x, y, rgb(...shade(PALETTE.stoneDark, edge > 2.6 ? 0.8 : 0.62)));
+      }
+    }
+  },
+
+  furnace_side: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const n = rng.next();
+        set(x, y, rgb(...mix(PALETTE.stone, PALETTE.stoneDark, n * 0.6)));
+      }
+    }
+    // A few cobble-like lumps so the furnace reads as masonry.
+    for (const [cx, cy] of [[3, 4], [11, 3], [4, 12], [12, 11]]) {
+      for (let y = -1; y <= 1; y++) {
+        for (let x = -1; x <= 1; x++) {
+          set(cx + x, cy + y, rgb(...shade(PALETTE.stoneLight, 0.72 + rng.next() * 0.3)));
+        }
+      }
+    }
+  },
+
+  /** The furnace mouth. Unlit: a dark opening with an iron grate. */
+  furnace_front: (set, rng) => {
+    PAINTERS.furnace_side(set, rng);
+    for (let y = 7; y <= 13; y++) {
+      for (let x = 3; x <= 12; x++) {
+        const inside = y <= 12 && x <= 11;
+        set(x, y, rgb(...(inside ? [26, 24, 26] : shade(PALETTE.stoneDark, 0.55))));
+      }
+    }
+    for (let x = 4; x <= 11; x++) set(x, 10, rgb(...shade(PALETTE.stoneDark, 0.7)));
+    for (let y = 8; y <= 12; y++) set(7, y, rgb(...shade(PALETTE.stoneDark, 0.7)));
+    for (let y = 8; y <= 12; y++) set(9, y, rgb(...shade(PALETTE.stoneDark, 0.7)));
+  },
+
+  iron_ore: (set, rng) => {
+    PAINTERS.stone(set, rng);
+    const lumps = [[3, 4, 2], [10, 4, 2], [6, 10, 2], [12, 11, 1], [2, 12, 1]];
+    for (const [cx, cy, r] of lumps) {
+      for (let y = -r; y <= r; y++) {
+        for (let x = -r; x <= r; x++) {
+          if (Math.hypot(x, y) > r + 0.2) continue;
+          const px = cx + x;
+          const py = cy + y;
+          if (px < 0 || px >= TILE || py < 0 || py >= TILE) continue;
+          const n = rng.next();
+          set(px, py, rgb(...shade(PALETTE.ironOre, 0.72 + n * 0.42)));
+        }
+      }
+    }
+  },
+
+  coal_block: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const n = rng.next();
+        set(x, y, rgb(...shade(PALETTE.coalBlock, 0.75 + n * 0.6)));
+      }
+    }
+    // Faceted highlights so a coal block is not a flat black square.
+    for (const [cx, cy] of [[4, 4], [11, 5], [6, 11]]) {
+      for (let y = 0; y < 3; y++) {
+        for (let x = 0; x < 3; x++) set(cx + x, cy + y, rgb(...[96, 98, 108]));
+      }
+    }
+  },
+
+  iron_block: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const n = rng.next();
+        set(x, y, rgb(...mix(PALETTE.iron, PALETTE.ironDark, n * 0.4)));
+      }
+    }
+    // Beaten-metal seams and rivets.
+    for (const at of [5, 10]) {
+      for (let x = 0; x < TILE; x++) set(x, at, rgb(...shade(PALETTE.ironDark, 0.85)));
+      for (let y = 0; y < TILE; y++) set(at, y, rgb(...shade(PALETTE.ironDark, 0.9)));
+    }
+    for (const [cx, cy] of [[2, 2], [13, 2], [2, 13], [13, 13]]) {
+      set(cx, cy, rgb(...PALETTE.ironLight));
+    }
+  },
+
+  stone_bricks: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const row = Math.floor(y / 4);
+        const offset = row % 2 === 0 ? 0 : 4;
+        const mortarH = y % 4 === 3;
+        const mortarV = (x + offset) % 8 === 7;
+        if (mortarH || mortarV) {
+          set(x, y, rgb(...shade(PALETTE.brick, 0.55 + rng.next() * 0.1)));
+          continue;
+        }
+        const n = rng.next();
+        set(x, y, rgb(...mix(PALETTE.brick, PALETTE.stoneLight, n * 0.35)));
+      }
+    }
+  },
+
+  cut_sandstone: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const n = rng.next();
+        let c = mix(PALETTE.sandstone, PALETTE.sandDark, 0.18 + n * 0.16);
+        // A single crisp inset panel line.
+        if (x === 0 || y === 0 || x === TILE - 1 || y === TILE - 1) c = shade(c, 0.86);
+        set(x, y, rgb(...c));
+      }
+    }
+  },
+
+  smooth_stone: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const n = rng.next();
+        set(x, y, rgb(...mix(PALETTE.stone, PALETTE.stoneLight, 0.25 + n * 0.2)));
+      }
+    }
+  },
+
+  smooth_sandstone: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const n = rng.next();
+        set(x, y, rgb(...mix(PALETTE.sandstone, PALETTE.sand, 0.3 + n * 0.25)));
+      }
+    }
+  },
+
+  /** Torch: a crossed-billboard stick with a flame, like the other plants. */
+  torch: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) set(x, y, null);
+    }
+    for (let y = 7; y < TILE; y++) {
+      set(7, y, rgb(...mix(PALETTE.bark, PALETTE.barkDark, rng.next() * 0.6)));
+      set(8, y, rgb(...shade(PALETTE.barkDark, 0.9)));
+    }
+    for (let y = 3; y <= 7; y++) {
+      for (let x = 5; x <= 10; x++) {
+        const d = Math.hypot((x - 7.5) / 3, (y - 5.2) / 3);
+        if (d > 1) continue;
+        const heat = 1 - d * 0.7;
+        set(x, y, rgb(...mix(PALETTE.torchFlame, [255, 246, 208], heat)));
+      }
+    }
+    set(7, 5, rgb(...[255, 252, 236]));
+    set(8, 5, rgb(...[255, 252, 236]));
+  },
+
+  // -------------------------------------------------------------------------
+  // Material item icons
+  // -------------------------------------------------------------------------
+
+  item_stick: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) set(x, y, null);
+    }
+    for (let i = 0; i < 10; i++) {
+      const x = 4 + i;
+      const y = 12 - i;
+      set(x, y, rgb(...mix(PALETTE.wood, PALETTE.woodDark, rng.next() * 0.5)));
+      set(x, y + 1, rgb(...shade(PALETTE.woodDark, 0.85)));
+      set(x + 1, y, rgb(...shade(PALETTE.wood, 0.9)));
+    }
+  },
+
+  item_charcoal: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const d = Math.hypot((x - 7.5) * 1.0, (y - 8) * 1.05) + rng.next() * 1.6;
+        if (d > 6.2) { set(x, y, null); continue; }
+        // Charcoal is duller and browner than coal.
+        const base = d > 5.2 ? [92, 78, 66] : [40, 36, 34];
+        set(x, y, rgb(...shade(base, 0.8 + rng.next() * 0.6)));
+      }
+    }
+  },
+
+  item_iron_nugget: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) {
+        const d = Math.hypot(x - 7.5, y - 8) + rng.next() * 1.2;
+        if (d > 4.6) { set(x, y, null); continue; }
+        set(x, y, rgb(...mix(PALETTE.iron, PALETTE.ironDark, d / 5 + rng.next() * 0.2)));
+      }
+    }
+    set(6, 6, rgb(...PALETTE.ironLight));
+    set(7, 6, rgb(...PALETTE.ironLight));
+  },
+
+  item_iron_ingot: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) set(x, y, null);
+    }
+    // A trapezoid ingot: wider at the base, with a bright top face.
+    for (let y = 5; y <= 12; y++) {
+      const inset = Math.round((y - 5) * 0.22);
+      for (let x = 3 + inset; x <= 12 - inset; x++) {
+        set(x, y, rgb(...mix(PALETTE.iron, PALETTE.ironDark, (y - 5) / 10 + rng.next() * 0.18)));
+      }
+    }
+    for (let x = 3; x <= 12; x++) set(x, 5, rgb(...PALETTE.ironLight));
+    for (let x = 4; x <= 11; x++) set(x, 6, rgb(...mix(PALETTE.iron, PALETTE.ironLight, 0.6)));
+  },
+
+  item_bucket: (set, rng) => {
+    for (let y = 0; y < TILE; y++) {
+      for (let x = 0; x < TILE; x++) set(x, y, null);
+    }
+    for (let y = 5; y <= 13; y++) {
+      const inset = y >= 12 ? 1 : 0;
+      for (let x = 3 + inset; x <= 12 - inset; x++) {
+        const edge = x === 3 + inset || x === 12 - inset;
+        set(x, y, rgb(...mix(PALETTE.iron, PALETTE.ironDark, edge ? 0.55 : 0.2 + rng.next() * 0.25)));
+      }
+    }
+    for (let x = 3; x <= 12; x++) set(x, 5, rgb(...PALETTE.ironLight));
+    // Handle.
+    for (let i = 0; i <= 6; i++) {
+      const x = 4 + i;
+      const y = 4 - Math.round(Math.sin((i / 6) * Math.PI) * 3);
+      set(x, y, rgb(...PALETTE.ironDark));
+    }
+  },
+
+  item_water_bucket: (set, rng) => {
+    PAINTERS.item_bucket(set, rng);
+    for (let y = 4; y <= 6; y++) {
+      for (let x = 4; x <= 11; x++) {
+        set(x, y, rgb(...mix(PALETTE.water, [150, 210, 255], (y - 4) * 0.3 + rng.next() * 0.2)));
+      }
+    }
+  },
+
+  // -------------------------------------------------------------------------
+  // Tool icons — one painter per tier and family, generated from a shared
+  // shape so a wooden pickaxe and an iron pickaxe stay recognisably related.
+  // -------------------------------------------------------------------------
+
+  item_wooden_pickaxe: (set, rng) => paintTool(set, rng, 'pickaxe', 1),
+  item_wooden_axe: (set, rng) => paintTool(set, rng, 'axe', 1),
+  item_wooden_shovel: (set, rng) => paintTool(set, rng, 'shovel', 1),
+  item_wooden_sword: (set, rng) => paintTool(set, rng, 'sword', 1),
+  item_stone_pickaxe: (set, rng) => paintTool(set, rng, 'pickaxe', 2),
+  item_stone_axe: (set, rng) => paintTool(set, rng, 'axe', 2),
+  item_stone_shovel: (set, rng) => paintTool(set, rng, 'shovel', 2),
+  item_stone_sword: (set, rng) => paintTool(set, rng, 'sword', 2),
+  item_iron_pickaxe: (set, rng) => paintTool(set, rng, 'pickaxe', 3),
+  item_iron_axe: (set, rng) => paintTool(set, rng, 'axe', 3),
+  item_iron_shovel: (set, rng) => paintTool(set, rng, 'shovel', 3),
+  item_iron_sword: (set, rng) => paintTool(set, rng, 'sword', 3),
 
   hand: (set, rng) => {
     // Skin for the first-person arm. The top third is a warm cloth sleeve so

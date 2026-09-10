@@ -2,7 +2,9 @@
  * Inventory.js — hotbar and backpack storage.
  *
  * Layout matches the familiar survival convention: slots 0..8 are the hotbar,
- * slots 9..35 are the backpack. Each slot holds `null` or `{ item, count }`.
+ * slots 9..35 are the backpack. Each slot holds `null` or
+ * `{ item, count, durability? }`. Tools are unstackable and carry a per-stack
+ * `durability`, which is why the slot shape is not just an item and a count.
  *
  * The inventory is deliberately independent of the UI and of the world: it only
  * knows about item keys and counts, which makes it trivial to serialise.
@@ -18,7 +20,7 @@ export const INVENTORY_SIZE = 36;
 export class Inventory {
   constructor(size = INVENTORY_SIZE) {
     this.size = size;
-    /** @type {Array<{item:string, count:number}|null>} */
+    /** @type {Array<{item:string, count:number, durability?:number}|null>} */
     this.slots = new Array(size).fill(null);
   }
 
@@ -42,7 +44,7 @@ export class Inventory {
   /**
    * Overwrite a slot.
    * @param {number} index
-   * @param {{item:string,count:number}|null} stack
+   * @param {{item:string,count:number,durability?:number}|null} stack
    */
   set(index, stack) {
     if (index < 0 || index >= this.size) return;
@@ -50,12 +52,23 @@ export class Inventory {
       this.slots[index] = null;
       return;
     }
-    this.slots[index] = stack ? { item: stack.item, count: stack.count } : null;
+    if (!stack) {
+      this.slots[index] = null;
+      return;
+    }
+    const maxStack = ItemRegistry.maxStack(stack.item);
+    const entry = { item: stack.item, count: Math.min(stack.count, maxStack) };
+    const maxDurability = ItemRegistry.durability(stack.item);
+    if (maxDurability > 0) {
+      const value = Number.isFinite(stack.durability) ? stack.durability : maxDurability;
+      entry.durability = Math.max(0, Math.min(maxDurability, Math.round(value)));
+    }
+    this.slots[index] = entry;
   }
 
   /**
    * Add items to the inventory, filling partial stacks first and then empty
-   * slots, hotbar before backpack.
+   * slots, hotbar before backpack. Tools arrive fresh, at full durability.
    *
    * @param {string} item
    * @param {number} count
@@ -64,9 +77,11 @@ export class Inventory {
   add(item, count = 1) {
     if (!ItemRegistry.isValid(item) || item === EMPTY_ITEM || count <= 0) return count;
     const maxStack = ItemRegistry.maxStack(item);
+    const durability = ItemRegistry.durability(item);
     let remaining = count;
 
-    // Pass 1: top up existing stacks that are not full.
+    // Pass 1: top up existing stacks that are not full. Tools have a stack
+    // limit of 1, so this pass can never merge them.
     for (let i = 0; i < this.size && remaining > 0; i++) {
       const slot = this.slots[i];
       if (!slot || slot.item !== item) continue;
@@ -83,10 +98,30 @@ export class Inventory {
       if (remaining <= 0) break;
       if (this.slots[i]) continue;
       const moved = Math.min(maxStack, remaining);
-      this.slots[i] = { item, count: moved };
+      const entry = { item, count: moved };
+      if (durability > 0) entry.durability = durability;
+      this.slots[i] = entry;
       remaining -= moved;
     }
     return remaining;
+  }
+
+  /**
+   * How many more of an item could still be stored, counting partial stacks
+   * and empty slots. Used to decide whether a craft's output fits.
+   *
+   * @param {string} item
+   * @returns {number}
+   */
+  roomFor(item) {
+    if (!ItemRegistry.isValid(item) || item === EMPTY_ITEM) return 0;
+    const maxStack = ItemRegistry.maxStack(item);
+    let room = 0;
+    for (const slot of this.slots) {
+      if (!slot) room += maxStack;
+      else if (slot.item === item) room += Math.max(0, maxStack - slot.count);
+    }
+    return room;
   }
 
   /** Iteration order for filling: hotbar then backpack. */
@@ -196,7 +231,11 @@ export class Inventory {
     const out = [];
     for (let i = 0; i < this.size; i++) {
       const slot = this.slots[i];
-      if (slot && slot.count > 0) out.push([i, slot.item, slot.count]);
+      if (!slot || slot.count <= 0) continue;
+      // Tools append their durability as a fourth element. Older saves simply
+      // omit it, and deserialize() tolerates both shapes.
+      if (slot.durability !== undefined) out.push([i, slot.item, slot.count, slot.durability]);
+      else out.push([i, slot.item, slot.count]);
     }
     return out;
   }
@@ -223,7 +262,17 @@ export class Inventory {
         continue;
       }
       const maxStack = ItemRegistry.maxStack(item);
-      this.slots[index] = { item, count: Math.min(count, maxStack) };
+      const stack = { item, count: Math.min(count, maxStack) };
+      const maxDurability = ItemRegistry.durability(item);
+      if (maxDurability > 0) {
+        const saved = Number(entry[3]);
+        // A tool with no stored durability is restored fully repaired rather
+        // than broken, which is the friendlier failure for a damaged save.
+        stack.durability = Number.isFinite(saved) && saved > 0
+          ? Math.min(maxDurability, Math.round(saved))
+          : maxDurability;
+      }
+      this.slots[index] = stack;
       restored++;
     }
     return { restored, skipped };
