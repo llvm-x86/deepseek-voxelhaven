@@ -11,6 +11,32 @@ image, audio or font files anywhere in this project).
 
 ---
 
+## Licence and attribution
+
+Voxelhaven's **code, block and item names, textures and audio are original**
+and are covered by the project's MIT licence (`license` in `package.json`).
+
+The **recipe data** in `src/data/recipes.json` is a different matter. It is
+derived from recipe structure published on the
+[Minecraft Wiki](https://minecraft.wiki), which is licensed
+**CC BY-NC-SA 3.0** (<https://meta.weirdgloop.org/w/Licensing>). That data —
+and only that data — is used under those terms:
+
+* **Attribution.** The generated file carries a header naming the source, the
+  retrieval date and the licence; see also the `NOTICE` file.
+* **Non-commercial.** CC BY-NC-SA is a *non-commercial* licence. Shipping
+  Voxelhaven commercially would require re-deriving the recipe corpus from a
+  source that permits it.
+* **Share-alike.** The recipe data itself stays under CC BY-NC-SA 3.0.
+* **Structure only.** Only *which item goes in which slot, in what quantity*
+  was taken. No wiki prose, images, sprites or templates are copied, and every
+  Voxelhaven block name, item name, texture and line of code is original.
+
+`tools/` contains the scraper, the mapping table and the generator that
+produced the snapshot, so the derivation is fully auditable and reproducible.
+
+---
+
 ## Running it
 
 Requirements: **Node.js 18 or newer** and a browser with **WebGL2**
@@ -45,18 +71,61 @@ node server.js --no-saves       # disable the on-disk save API
 | `Shift` | Sprint |
 | `Ctrl` or `C` | Crouch |
 | Left click | Break block / attack |
-| Right click | Place block |
+| Right click | Place block, or use a crafting table / furnace / bucket |
 | Middle click | Pick the targeted block into the hotbar |
 | `Q` | Drop one item |
 | `1`–`9`, mouse wheel | Select a hotbar slot |
-| `E` or `Tab` | Inventory and crafting |
-| `R` | Crafting screen |
+| `E` or `Tab` | Inventory, with the 2×2 crafting grid |
+| `R` | Inventory, scrolled to the recipe browser |
 | `F3` or `` ` `` | Debug overlay |
 | `F2` | Save a screenshot |
 | `M` | Mute audio |
 | `Esc` | Pause menu |
 
 Click the world once to capture the mouse. `Esc` releases it.
+
+---
+
+## How to play it: the progression
+
+Voxelhaven's crafting follows the Minecraft one closely enough that the wiki is
+a usable manual, scaled down to the items the game actually has.
+
+1. **Timber.** Punch a tree. Logs break fastest with an axe but yield to bare
+   hands; you need three logs to reach an iron pickaxe.
+2. **Planks and sticks.** `E` opens the inventory and its 2×2 grid. Lay a log
+   out (or click *Lay out* in the recipe browser on the right) and take four
+   planks; two planks stacked vertically make four sticks.
+3. **Crafting table.** Four planks in a square. Place it with right-click.
+4. **Wooden tools.** Right-click the placed table to open the 3×3 grid: three
+   planks across the top and two sticks below make a pickaxe; the axe and the
+   shovel use the wiki's own shapes.
+5. **Stone.** A wooden pickaxe is the first tool that can harvest stone, and
+   stone is the first block that bare hands break without getting anything.
+   Cobblestone from that first block makes stone tools, which are twice as fast.
+   Behind the spawn, a stone block is also the quickest way to see the tool
+   tier rules for yourself.
+6. **Furnace.** Eight cobblestone in a ring. Right-click it to open the
+   smelting screen: fuel at the bottom, ore at the top.
+7. **Charcoal and torches.** Smelt a log into charcoal, then combine charcoal
+   (or coal, from the black-speckled ore near the surface) with a stick for
+   four torches. Torches are crossed-billboard plants that light caves for
+   twelve blocks.
+8. **Iron.** Iron ore sits below y≈44 and needs a *stone* pickaxe. Smelt it
+   into ingots, then craft an iron pickaxe, a bucket, a block of iron, or the
+   wiki's lantern (eight iron nuggets around a torch).
+9. **Water and turf.** Fill the bucket from any water block by right-clicking
+   it, then use the water bucket on four loam to grow turf — the bucket comes
+   back empty, which is the game's one reminder that crafting can return
+   containers.
+10. **Everything else.** Stone bricks, sandstone, cut sandstone, smooth stone
+    and smooth sandstone come from the wiki's building-block recipes, and coal
+    blocks and iron blocks compress nine items into one.
+
+The **recipe browser** on the right of the inventory screen lists every recipe
+in the game. It stays visible when you cannot afford something, greys out what
+you are missing, and fills the grid for you when you can — so you can always
+see what the next step is.
 
 ---
 
@@ -85,9 +154,13 @@ voxelhaven/
 │   │   ├── Noise.js           Perlin noise, fBm, ridged multifractal
 │   │   └── Random.js          Deterministic PRNGs and integer hashes
 │   │
+│   ├── data/
+│   │   ├── recipes.json       Vendored recipe snapshot, generated from the wiki
+│   │   └── RecipeBook.js      Loads and indexes the snapshot for the engine
+│   │
 │   ├── world/
-│   │   ├── Blocks.js          Block registry (+ flat lookup tables for hot paths)
-│   │   ├── Items.js           Item registry (blocks and materials)
+│   │   ├── Blocks.js          Block registry (+ tool families and harvest tiers)
+│   │   ├── Items.js           Item registry (blocks, materials, tools, durability)
 │   │   ├── Chunk.js           16 x 128 x 16 voxel storage, light arrays, delta map
 │   │   ├── World.js           Authoritative voxel store, edits, world-coordinate API
 │   │   ├── TerrainGenerator.js Biomes, elevation, caves, ore veins, trees
@@ -114,7 +187,8 @@ voxelhaven/
 │   │   ├── Camera.js          Projection/view matrices and the view frustum
 │   │   ├── Physics.js         AABB-vs-voxel collision resolution
 │   │   ├── Inventory.js       Hotbar + backpack, stacking and merging
-│   │   └── Interaction.js     Breaking, placing, attacking, dropping
+│   │   ├── CraftGrid.js       The 2×2 / 3×3 crafting grid as a container
+│   │   └── Interaction.js     Breaking, placing, using, attacking, dropping
 │   │
 │   ├── entities/
 │   │   ├── Entity.js          Base entity: physics, turning, serialisation
@@ -129,18 +203,30 @@ voxelhaven/
 │   │   ├── Input.js           Keyboard, mouse and pointer lock
 │   │   ├── AudioSystem.js     Every sound, synthesised with Web Audio
 │   │   ├── SaveSystem.js      World persistence (seed + delta)
-│   │   └── Crafting.js        The recipe book
+│   │   ├── Crafting.js        Grid matching and the crafting engine
+│   │   └── Smelting.js        Furnace simulation (fuel, burn timer, cook timer)
 │   │
 │   ├── ui/
 │   │   ├── HUD.js             Crosshair, hotbar, hearts, breath, debug overlay
 │   │   ├── Menus.js           Main menu, world list, create, pause, settings, death
-│   │   └── InventoryUI.js     Inventory grid and craft panel
+│   │   ├── SlotView.js        Shared slot rendering and the held-stack model
+│   │   ├── InventoryUI.js     Inventory / crafting-table screen and recipe browser
+│   │   └── FurnaceUI.js       Smelting screen (input, fuel, result, gauges)
 │   │
 │   └── workers/
 │       └── terrain.worker.js  Off-thread chunk generation
 │
+├── tools/                     Development tools; never loaded by the game
+│   ├── scrape-wiki.mjs        Fetches the wiki's recipe tables into the cache
+│   ├── build-recipes.mjs      Corpus + mapping -> src/data/recipes.json
+│   ├── mappings/item-map.json Wiki name -> Voxelhaven item, tag and fuel tables
+│   ├── lib/wiki-client.mjs    robots.txt-aware, rate-limited, caching HTTP client
+│   ├── lib/html-lite.mjs      Small HTML parser (no dependencies)
+│   ├── lib/recipe-extract.mjs Rendered recipe grid -> normalised records
+│   └── cache/                 Cached wiki pages and the extracted corpus
+│
 └── test/
-    ├── run-tests.mjs          End-to-end integration suite (drives a real browser)
+    ├── run-tests.mjs          Integration suite: offline checks + a real browser
     └── headless.mjs           Server + browser harness for the tests
 ```
 
@@ -220,12 +306,28 @@ npm run test:headed  # watch it play
 It looks for Chrome at `CHROME_PATH` or the usual system locations and forces
 software WebGL (SwiftShader), so it runs on machines with no GPU.
 
-The suite covers 89 assertions across: world creation, terrain generation,
-determinism, caves, trees, movement, jumping, gravity, fall damage, collision,
-raycast targeting, breaking, dropping, pickup, placing, placement refusal,
-stacking, the hotbar, crafting, lighting, the day/night cycle, mobs, loot,
-saving, reloading, save corruption handling, rendering output, death, respawn,
-and console hygiene.
+The suite covers **237 assertions**. It runs in two halves:
+
+**Offline checks** (plain module imports, no server, no browser) cover the
+recipe snapshot and its attribution, mapping integrity (every referenced item
+exists, every recipe matches its own arrangement, and every ingredient is
+reachable from what the world can supply), shaped / shapeless / mirrored /
+tag / "Matching" matching, grid offsets, consumption, inventory-room refusal,
+remainders, per-slot counts, tool tiers and durability, the furnace
+simulation, byte-identical regeneration of `recipes.json` from the cached
+corpus, and `match()` performance.
+
+**Browser checks** cover world creation, terrain generation, determinism,
+caves, trees, movement, jumping, gravity, fall damage, collision, raycast
+targeting, breaking, dropping, pickup, placing, placement refusal, stacking,
+the hotbar, the crafting screen (2×2 and 3×3 grids, the result preview, the
+recipe browser, keyboard operation, closing returns grid contents), lighting,
+the day/night cycle, mobs, loot, saving, reloading, save corruption handling,
+rendering output, death, respawn, console hygiene, and a full end-to-end
+journey: fell a tree → craft planks → craft a crafting table → place it →
+right-click it for the 3×3 grid → craft a pickaxe → mine stone with it →
+smelt iron in a placed furnace → save → quit → load → confirm the crafted
+items, the tool's durability and the placed blocks all survived.
 
 ---
 
@@ -261,11 +363,25 @@ Two optimisations do most of the work:
 
 These are deliberate scope choices, not unfinished work:
 
-* **No crafting table, furnace or tools.** The recipe book is a small
-  affordance panel rather than a grid. Blocks break at a fixed speed regardless
-  of what is held.
-* **No fluid simulation.** Water is placed by the generator and stays put;
-  breaking a block next to water does not flood the space.
+* **Water is a block, not a fluid.** It is placed by the generator and stays
+  put; breaking a block next to water does not flood the space. A bucket can
+  scoop it, and that is all.
+* **The recipe corpus is a coherent subset.** Voxelhaven has 49 items against
+  Minecraft's several thousand, so 30 of the wiki's 622 crafting recipes and 6
+  of its smelting recipes are supported. Everything shipped is craftable: the
+  test suite proves every recipe's ingredients are reachable from what the
+  world generates. The excluded families are listed in
+  `tools/mappings/item-map.json` under `unsupported`, with a reason for each.
+* **No smelting variants.** There is one furnace; there is no blast furnace,
+  smoker or campfire, and no experience or hunger. Smelting returns items only.
+* **No redstone, chests or item transport.** Dropped items are entities that
+  despawn after five minutes, and a furnace is the only block with an
+  inventory of its own.
+* **No non-cube block models.** The mesher builds full cubes and crossed
+  billboards, so slabs, stairs, fences, doors, panes, ladders and signs do not
+  exist — which is why their recipes are absent rather than broken.
+* **No dye, wool, clay, nether or ocean content,** so every recipe that needs
+  those materials is excluded.
 * **No redstone, chests, or item transport.** Dropped items are entities that
   despawn after five minutes.
 * **Caves are noise-carved, not connected.** There is no guarantee that a cave
@@ -276,6 +392,8 @@ These are deliberate scope choices, not unfinished work:
 * **Lighting is per-chunk, not per-block-tick.** A block change rebuilds the
   affected chunks (up to nine) rather than doing an incremental light edit.
   This is exact but costs a few milliseconds per edit, spread across frames.
+  A chunk never imports light from a neighbour that is itself queued for a
+  rebuild, which is what stops a removed lantern from leaving a ghost behind.
 * **Only one dimension.** There is no Nether-like second world.
 * **No multiplayer.** Saves are local to the machine running the server.
 * **The terrain is 128 blocks tall.** The generator caps peaks well below that

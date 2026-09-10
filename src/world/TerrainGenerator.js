@@ -68,6 +68,13 @@ export const TERRAIN = {
   /** Coal vein vertical range. */
   coalMinY: 5,
   coalMaxY: 58,
+  /** Iron veins are rarer, smaller and sit deeper than coal. */
+  ironVeinsPerChunk: 4,
+  /** Iron vein vertical range. */
+  ironMinY: 4,
+  ironMaxY: 44,
+  /** Iron veins never break the surface, so stone tools stay a requirement. */
+  ironSurfaceMargin: 6,
   /** Cave carving is suppressed within this many blocks of the surface. */
   caveSurfaceMargin: 3,
   /** Caves are only carved inside this vertical band (tunnels). */
@@ -120,6 +127,41 @@ const SALT = {
   glowcap: 0x11223344,
   surface: 0x55667788
 };
+
+/**
+ * Scatter one family of ore veins through a chunk.
+ *
+ * A vein is a short random walk that only ever replaces plain stone, so veins
+ * never punch through caves, water or the surface. All decisions come from the
+ * caller's deterministic RNG, which keeps the same seed producing the same
+ * world no matter what order chunks are generated in.
+ *
+ * @param {Uint8Array} blocks chunk block array
+ * @param {import('../core/Random.js').Random} rng per-chunk stream
+ * @param {number} oreId block id to place
+ * @param {{veins:number,minY:number,maxY:number,minSize:number,maxSize:number}} options
+ */
+function scatterVein(blocks, rng, oreId, options) {
+  for (let vein = 0; vein < options.veins; vein++) {
+    let x = rng.int(0, CHUNK_SIZE - 1);
+    let z = rng.int(0, CHUNK_SIZE - 1);
+    let y = rng.int(options.minY, options.maxY);
+    const size = rng.int(options.minSize, options.maxSize);
+
+    for (let step = 0; step < size; step++) {
+      if (x >= 0 && x < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE
+        && y > TERRAIN.bedrockDepth && y < WORLD_HEIGHT) {
+        const index = (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
+        if (blocks[index] === BlockId.STONE) blocks[index] = oreId;
+      }
+      // Random walk biased to spread out rather than clump.
+      const axis = rng.int(0, 2);
+      if (axis === 0) x += rng.sign();
+      else if (axis === 1) z += rng.sign();
+      else y += rng.sign();
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Coarse scalar field
@@ -541,24 +583,23 @@ export class TerrainGenerator {
     const rng = chunkRandom(this.seed, chunk.cx, chunk.cz, SALT.ore);
     const blocks = chunk.blocks;
 
-    for (let vein = 0; vein < TERRAIN.coalVeinsPerChunk; vein++) {
-      let x = rng.int(0, CHUNK_SIZE - 1);
-      let z = rng.int(0, CHUNK_SIZE - 1);
-      let y = rng.int(TERRAIN.coalMinY, TERRAIN.coalMaxY);
-      const size = rng.int(4, 10);
+    scatterVein(blocks, rng, BlockId.COAL_ORE, {
+      veins: TERRAIN.coalVeinsPerChunk,
+      minY: TERRAIN.coalMinY,
+      maxY: TERRAIN.coalMaxY,
+      minSize: 4,
+      maxSize: 10
+    });
 
-      for (let step = 0; step < size; step++) {
-        if (x >= 0 && x < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE && y > TERRAIN.bedrockDepth && y < WORLD_HEIGHT) {
-          const index = (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
-          if (blocks[index] === BlockId.STONE) blocks[index] = BlockId.COAL_ORE;
-        }
-        // Random walk biased to spread out rather than clump.
-        const axis = rng.int(0, 2);
-        if (axis === 0) x += rng.sign();
-        else if (axis === 1) z += rng.sign();
-        else y += rng.sign();
-      }
-    }
+    scatterVein(blocks, rng, BlockId.IRON_ORE, {
+      veins: TERRAIN.ironVeinsPerChunk,
+      minY: TERRAIN.ironMinY,
+      // Iron stays below the deepest common surface, which is what makes the
+      // stone -> iron step require a real descent.
+      maxY: TERRAIN.ironMaxY,
+      minSize: 3,
+      maxSize: 7
+    });
 
     // A few glowcaps growing on cave floors give the underground some light.
     const glowRng = chunkRandom(this.seed, chunk.cx, chunk.cz, SALT.glowcap);

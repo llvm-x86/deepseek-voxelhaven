@@ -1,0 +1,1031 @@
+{
+  "source": "Minecraft Wiki (minecraft.wiki), Crafting recipe data",
+  "license": "CC BY-NC-SA 3.0",
+  "retrieved": "2026-09-10",
+  "attribution": "Recipe structure derived from the Minecraft Wiki (https://minecraft.wiki), retrieved 2026-09-10, licensed CC BY-NC-SA 3.0 (https://meta.weirdgloop.org/w/Licensing). Only recipe structure — which item goes in which slot, in what quantity — is reproduced; no wiki prose, images or sprites are included. This data is used non-commercially. Voxelhaven item names, textures and code are original.",
+  "sourceUrl": "https://minecraft.wiki/w/Crafting",
+  "generator": "tools/build-recipes.mjs from tools/cache/crafting-corpus.json",
+  "tags": {
+    "logs": [
+      "timber"
+    ],
+    "planks": [
+      "planks"
+    ],
+    "stone_tier": [
+      "cobble"
+    ]
+  },
+  "fuels": {
+    "charcoal": 8,
+    "coal": 8,
+    "coal_block": 80,
+    "crafting_table": 1.5,
+    "planks": 1.5,
+    "stick": 0.5,
+    "timber": 1.5
+  },
+  "recipes": [
+    {
+      "id": "bucket",
+      "type": "shaped",
+      "name": "Bucket",
+      "pattern": [
+        "# #",
+        " # "
+      ],
+      "width": 3,
+      "height": 2,
+      "key": {
+        "#": [
+          "iron_ingot"
+        ]
+      },
+      "output": {
+        "item": "bucket",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Utilities",
+        "category": "Crafting/Utilities"
+      }
+    },
+    {
+      "id": "canopy_from_fiber",
+      "type": "shapeless",
+      "name": "Canopy",
+      "ingredients": [
+        [
+          "fiber"
+        ],
+        [
+          "fiber"
+        ],
+        [
+          "fiber"
+        ],
+        [
+          "fiber"
+        ]
+      ],
+      "output": {
+        "item": "canopy",
+        "count": 1
+      },
+      "station": "inventory",
+      "origin": "voxelhaven",
+      "source": {
+        "page": null,
+        "category": null,
+        "note": "Voxelhaven's original fiber-to-canopy recipe, kept from the flat crafting list. It is declared shapeless because weaving four tufts of fiber has no meaningful arrangement — any four slots do."
+      }
+    },
+    {
+      "id": "coal",
+      "type": "shaped",
+      "name": "Coal",
+      "pattern": [
+        "#"
+      ],
+      "width": 1,
+      "height": 1,
+      "key": {
+        "#": [
+          "coal_block"
+        ]
+      },
+      "output": {
+        "item": "coal",
+        "count": 9
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Materials",
+        "category": "Crafting/Materials"
+      }
+    },
+    {
+      "id": "coal_block",
+      "type": "shaped",
+      "name": "Block of Coal",
+      "pattern": [
+        "###",
+        "###",
+        "###"
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "coal"
+        ]
+      },
+      "output": {
+        "item": "coal_block",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Building blocks",
+        "category": "Crafting/Building blocks"
+      }
+    },
+    {
+      "id": "crafting_table",
+      "type": "shaped",
+      "name": "Crafting Table",
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "width": 2,
+      "height": 2,
+      "key": {
+        "#": [
+          "planks"
+        ]
+      },
+      "output": {
+        "item": "crafting_table",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Decoration blocks",
+        "category": "Crafting/Decoration blocks"
+      }
+    },
+    {
+      "id": "cut_sandstone",
+      "type": "shaped",
+      "name": "Cut Sandstone",
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "width": 2,
+      "height": 2,
+      "key": {
+        "#": [
+          "sandstone"
+        ]
+      },
+      "output": {
+        "item": "cut_sandstone",
+        "count": 4
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Building blocks",
+        "category": "Crafting/Building blocks"
+      }
+    },
+    {
+      "id": "furnace",
+      "type": "shaped",
+      "name": "Furnace",
+      "pattern": [
+        "###",
+        "# #",
+        "###"
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "stone_tier"
+        ]
+      },
+      "output": {
+        "item": "furnace",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Decoration blocks",
+        "category": "Crafting/Decoration blocks"
+      }
+    },
+    {
+      "id": "iron_axe",
+      "type": "shaped",
+      "name": "Iron Axe",
+      "pattern": [
+        "##",
+        "#A",
+        " A"
+      ],
+      "width": 2,
+      "height": 3,
+      "key": {
+        "#": [
+          "iron_ingot"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "iron_axe",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "iron_block",
+      "type": "shaped",
+      "name": "Block of Iron",
+      "pattern": [
+        "###",
+        "###",
+        "###"
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "iron_ingot"
+        ]
+      },
+      "output": {
+        "item": "iron_block",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Building blocks",
+        "category": "Crafting/Building blocks"
+      }
+    },
+    {
+      "id": "iron_ingot_from_iron_block",
+      "type": "shaped",
+      "name": "Iron Ingot",
+      "pattern": [
+        "#"
+      ],
+      "width": 1,
+      "height": 1,
+      "key": {
+        "#": [
+          "iron_block"
+        ]
+      },
+      "output": {
+        "item": "iron_ingot",
+        "count": 9
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Materials",
+        "category": "Crafting/Materials"
+      }
+    },
+    {
+      "id": "iron_ingot_from_iron_nugget",
+      "type": "shaped",
+      "name": "Iron Ingot",
+      "pattern": [
+        "###",
+        "###",
+        "###"
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "iron_nugget"
+        ]
+      },
+      "output": {
+        "item": "iron_ingot",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Materials",
+        "category": "Crafting/Materials"
+      }
+    },
+    {
+      "id": "iron_nugget",
+      "type": "shaped",
+      "name": "Iron Nugget",
+      "pattern": [
+        "#"
+      ],
+      "width": 1,
+      "height": 1,
+      "key": {
+        "#": [
+          "iron_ingot"
+        ]
+      },
+      "output": {
+        "item": "iron_nugget",
+        "count": 9
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Materials",
+        "category": "Crafting/Materials"
+      }
+    },
+    {
+      "id": "iron_pickaxe",
+      "type": "shaped",
+      "name": "Iron Pickaxe",
+      "pattern": [
+        "###",
+        " A ",
+        " A "
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "iron_ingot"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "iron_pickaxe",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "iron_shovel",
+      "type": "shaped",
+      "name": "Iron Shovel",
+      "pattern": [
+        "#",
+        "A",
+        "A"
+      ],
+      "width": 1,
+      "height": 3,
+      "key": {
+        "#": [
+          "iron_ingot"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "iron_shovel",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "iron_sword",
+      "type": "shaped",
+      "name": "Iron Sword",
+      "pattern": [
+        "#",
+        "#",
+        "A"
+      ],
+      "width": 1,
+      "height": 3,
+      "key": {
+        "#": [
+          "iron_ingot"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "iron_sword",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Combat",
+        "category": "Crafting/Combat"
+      }
+    },
+    {
+      "id": "lantern",
+      "type": "shaped",
+      "name": "Lantern",
+      "pattern": [
+        "###",
+        "#A#",
+        "###"
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "iron_nugget"
+        ],
+        "A": [
+          "torch"
+        ]
+      },
+      "output": {
+        "item": "lantern",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Decoration blocks",
+        "category": "Crafting/Decoration blocks"
+      }
+    },
+    {
+      "id": "planks",
+      "type": "shaped",
+      "name": "Planks",
+      "pattern": [
+        "#"
+      ],
+      "width": 1,
+      "height": 1,
+      "key": {
+        "#": [
+          "logs"
+        ]
+      },
+      "output": {
+        "item": "planks",
+        "count": 4
+      },
+      "mirrored": true,
+      "matching": true,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Building blocks",
+        "category": "Crafting/Building blocks"
+      }
+    },
+    {
+      "id": "sandstone",
+      "type": "shaped",
+      "name": "Sandstone",
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "width": 2,
+      "height": 2,
+      "key": {
+        "#": [
+          "sand"
+        ]
+      },
+      "output": {
+        "item": "sandstone",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Building blocks",
+        "category": "Crafting/Building blocks"
+      }
+    },
+    {
+      "id": "stick",
+      "type": "shaped",
+      "name": "Stick",
+      "pattern": [
+        "#",
+        "#"
+      ],
+      "width": 1,
+      "height": 2,
+      "key": {
+        "#": [
+          "planks"
+        ]
+      },
+      "output": {
+        "item": "stick",
+        "count": 4
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Materials",
+        "category": "Crafting/Materials"
+      }
+    },
+    {
+      "id": "stone_axe",
+      "type": "shaped",
+      "name": "Stone Axe",
+      "pattern": [
+        "##",
+        "#A",
+        " A"
+      ],
+      "width": 2,
+      "height": 3,
+      "key": {
+        "#": [
+          "stone_tier"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "stone_axe",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "stone_bricks",
+      "type": "shaped",
+      "name": "Stone Bricks",
+      "pattern": [
+        "##",
+        "##"
+      ],
+      "width": 2,
+      "height": 2,
+      "key": {
+        "#": [
+          "stone"
+        ]
+      },
+      "output": {
+        "item": "stone_bricks",
+        "count": 4
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Building blocks",
+        "category": "Crafting/Building blocks"
+      }
+    },
+    {
+      "id": "stone_pickaxe",
+      "type": "shaped",
+      "name": "Stone Pickaxe",
+      "pattern": [
+        "###",
+        " A ",
+        " A "
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "stone_tier"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "stone_pickaxe",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "stone_shovel",
+      "type": "shaped",
+      "name": "Stone Shovel",
+      "pattern": [
+        "#",
+        "A",
+        "A"
+      ],
+      "width": 1,
+      "height": 3,
+      "key": {
+        "#": [
+          "stone_tier"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "stone_shovel",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "stone_sword",
+      "type": "shaped",
+      "name": "Stone Sword",
+      "pattern": [
+        "#",
+        "#",
+        "A"
+      ],
+      "width": 1,
+      "height": 3,
+      "key": {
+        "#": [
+          "stone_tier"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "stone_sword",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Combat",
+        "category": "Crafting/Combat"
+      }
+    },
+    {
+      "id": "torch",
+      "type": "shaped",
+      "name": "Torch",
+      "pattern": [
+        "#",
+        "A"
+      ],
+      "width": 1,
+      "height": 2,
+      "key": {
+        "#": [
+          "coal",
+          "charcoal"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "torch",
+        "count": 4
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "inventory",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Decoration blocks",
+        "category": "Crafting/Decoration blocks"
+      }
+    },
+    {
+      "id": "turf_from_loam",
+      "type": "shaped",
+      "name": "Turf",
+      "pattern": [
+        " # ",
+        "#A#",
+        " # "
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "loam"
+        ],
+        "A": [
+          "water_bucket"
+        ]
+      },
+      "output": {
+        "item": "turf",
+        "count": 2
+      },
+      "mirrored": true,
+      "matching": false,
+      "remainder": {
+        "A": {
+          "item": "bucket",
+          "count": 1
+        }
+      },
+      "station": "crafting_table",
+      "origin": "voxelhaven",
+      "source": {
+        "page": null,
+        "category": null,
+        "note": "Vanilla has no recipe that returns a container, because its only container recipes (Cake, Honey Block) need milk, sugar, eggs, wheat or honey, none of which exist in Voxelhaven. This original recipe keeps the wiki's remainder semantics reachable in real play: a water bucket wets loam until turf grows on it, and the empty bucket comes back. Turf is otherwise unobtainable, since mining it yields loam the way vanilla grass does."
+      }
+    },
+    {
+      "id": "wooden_axe",
+      "type": "shaped",
+      "name": "Wooden Axe",
+      "pattern": [
+        "##",
+        "#A",
+        " A"
+      ],
+      "width": 2,
+      "height": 3,
+      "key": {
+        "#": [
+          "planks"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "wooden_axe",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "wooden_pickaxe",
+      "type": "shaped",
+      "name": "Wooden Pickaxe",
+      "pattern": [
+        "###",
+        " A ",
+        " A "
+      ],
+      "width": 3,
+      "height": 3,
+      "key": {
+        "#": [
+          "planks"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "wooden_pickaxe",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "wooden_shovel",
+      "type": "shaped",
+      "name": "Wooden Shovel",
+      "pattern": [
+        "#",
+        "A",
+        "A"
+      ],
+      "width": 1,
+      "height": 3,
+      "key": {
+        "#": [
+          "planks"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "wooden_shovel",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Tools",
+        "category": "Crafting/Tools"
+      }
+    },
+    {
+      "id": "wooden_sword",
+      "type": "shaped",
+      "name": "Wooden Sword",
+      "pattern": [
+        "#",
+        "#",
+        "A"
+      ],
+      "width": 1,
+      "height": 3,
+      "key": {
+        "#": [
+          "planks"
+        ],
+        "A": [
+          "stick"
+        ]
+      },
+      "output": {
+        "item": "wooden_sword",
+        "count": 1
+      },
+      "mirrored": true,
+      "matching": false,
+      "station": "crafting_table",
+      "origin": "minecraft-wiki",
+      "source": {
+        "page": "Crafting/Combat",
+        "category": "Crafting/Combat"
+      }
+    }
+  ],
+  "smelting": [
+    {
+      "id": "charcoal_from_timber",
+      "inputs": [
+        "timber"
+      ],
+      "output": {
+        "item": "charcoal",
+        "count": 1
+      },
+      "seconds": 10,
+      "experience": 0.15,
+      "source": {
+        "page": "Charcoal"
+      }
+    },
+    {
+      "id": "glass_from_sand",
+      "inputs": [
+        "sand"
+      ],
+      "output": {
+        "item": "glass",
+        "count": 1
+      },
+      "seconds": 10,
+      "experience": 0.1,
+      "source": {
+        "page": "Glass"
+      }
+    },
+    {
+      "id": "iron_ingot_from_iron_ore",
+      "inputs": [
+        "iron_ore"
+      ],
+      "output": {
+        "item": "iron_ingot",
+        "count": 1
+      },
+      "seconds": 10,
+      "experience": 0.7,
+      "source": {
+        "page": "Iron Ingot"
+      }
+    },
+    {
+      "id": "smooth_sandstone_from_sandstone",
+      "inputs": [
+        "sandstone"
+      ],
+      "output": {
+        "item": "smooth_sandstone",
+        "count": 1
+      },
+      "seconds": 10,
+      "experience": 0.1,
+      "source": {
+        "page": "Sandstone"
+      }
+    },
+    {
+      "id": "smooth_stone_from_stone",
+      "inputs": [
+        "stone"
+      ],
+      "output": {
+        "item": "smooth_stone",
+        "count": 1
+      },
+      "seconds": 10,
+      "experience": 0.1,
+      "source": {
+        "page": "Stone"
+      }
+    },
+    {
+      "id": "stone_from_cobble",
+      "inputs": [
+        "cobble"
+      ],
+      "output": {
+        "item": "stone",
+        "count": 1
+      },
+      "seconds": 10,
+      "experience": 0.1,
+      "source": {
+        "page": "Stone"
+      }
+    }
+  ]
+}

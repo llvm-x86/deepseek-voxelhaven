@@ -1,0 +1,45 @@
+Voxelhaven — third-party notices
+================================
+
+Recipe data
+-----------
+
+File:      src/data/recipes.json
+Source:    Minecraft Wiki — https://minecraft.wiki
+           Crafting index: https://minecraft.wiki/w/Crafting
+Licence:   Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported
+           (CC BY-NC-SA 3.0)
+           https://creativecommons.org/licenses/by-nc-sa/3.0/
+           https://meta.weirdgloop.org/w/Licensing
+
+The recipe data in that file is derived from recipe structure published on the
+Minecraft Wiki. It is used under the terms of CC BY-NC-SA 3.0:
+
+  * Attribution is given here, in the README, and in a header field inside the
+    generated data file itself, which names the source, the retrieval date and
+    the licence.
+  * The use is NON-COMMERCIAL. CC BY-NC-SA 3.0 forbids commercial use of the
+    licensed material. Distributing Voxelhaven commercially would require
+    re-deriving the recipe corpus from a source that permits commercial use.
+  * Share-alike applies to the recipe data: it remains available under
+    CC BY-NC-SA 3.0, and any adaptation of it must carry the same licence.
+
+Only recipe *structure* was taken — which item goes in which slot, in what
+quantity, and the wiki's own flags for shapeless, fixed and "Matching"
+recipes. No wiki prose, no wiki images or sprites, and no wiki templates are
+included in this repository, and no wiki content is loaded at run time.
+
+Everything else
+---------------
+
+All other content of this project — the game code, the block and item names,
+the mobs, the procedurally generated textures and all audio — is original to
+Voxelhaven and is covered by the project's MIT licence (declared as
+`license: MIT` in package.json).
+
+Tools
+-----
+
+The scraper in tools/ reads the public pages of the Minecraft Wiki at a rate of
+at most one request per second, respects that site's robots.txt, and caches
+every response on disk. The game itself never makes a network request.

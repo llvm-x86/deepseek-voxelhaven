@@ -1,0 +1,175 @@
+{
+  "$comment": [
+    "item-map.json — the auditable bridge between Minecraft Wiki names and Voxelhaven items.",
+    "Used only by tools/build-recipes.mjs (a development tool); the game never reads it.",
+    "",
+    "Resolution order for one wiki ingredient name:",
+    "  1. `items`   — an exact name match.",
+    "  2. `patterns` — a regular expression, tried in order. Used for the wood",
+    "     families (48 log/wood/stem/hyphae names and 13 plank names) where an",
+    "     exhaustive list would be noise. Every name a pattern resolves is",
+    "     printed by the builder, so the mapping stays auditable.",
+    "  3. Otherwise the name is unmapped: the recipe is reported and skipped.",
+    "",
+    "A name is only listed here when Voxelhaven genuinely has the item. Nothing",
+    "is mapped onto a lookalike to inflate the recipe count."
+  ],
+
+  "items": {
+    "Cobblestone": "cobble",
+    "Stone": "stone",
+    "Sandstone": "sandstone",
+    "Cut Sandstone": "cut_sandstone",
+    "Smooth Sandstone": "smooth_sandstone",
+    "Stone Bricks": "stone_bricks",
+    "Smooth Stone": "smooth_stone",
+    "Sand": "sand",
+    "Gravel": "gravel",
+    "Dirt": "loam",
+    "Snow Block": "snow",
+    "Cactus": "cactus",
+    "Glass": "glass",
+
+    "Coal": "coal",
+    "Charcoal": "charcoal",
+    "Stick": "stick",
+    "Iron Ingot": "iron_ingot",
+    "Iron Nugget": "iron_nugget",
+    "Iron Ore": "iron_ore",
+    "Block of Iron": "iron_block",
+    "Block of Coal": "coal_block",
+    "Torch": "torch",
+    "Bucket": "bucket",
+
+    "Crafting Table": "crafting_table",
+    "Furnace": "furnace",
+    "Lantern": "lantern",
+
+    "Wooden Pickaxe": "wooden_pickaxe",
+    "Wooden Axe": "wooden_axe",
+    "Wooden Shovel": "wooden_shovel",
+    "Wooden Sword": "wooden_sword",
+    "Stone Pickaxe": "stone_pickaxe",
+    "Stone Axe": "stone_axe",
+    "Stone Shovel": "stone_shovel",
+    "Stone Sword": "stone_sword",
+    "Iron Pickaxe": "iron_pickaxe",
+    "Iron Axe": "iron_axe",
+    "Iron Shovel": "iron_shovel",
+    "Iron Sword": "iron_sword"
+  },
+
+  "patterns": [
+    {
+      "match": "^(?:Stripped )?(?:Oak|Spruce|Birch|Jungle|Acacia|Dark Oak|Mangrove|Cherry|Pale Oak|Poplar) (?:Log|Wood)$",
+      "item": "timber",
+      "note": "Every Overworld log and bark block is one Timber block in Voxelhaven."
+    },
+    {
+      "match": "^(?:Stripped )?(?:Crimson|Warped) (?:Stem|Hyphae)$",
+      "item": "timber",
+      "note": "Nether stems are bark blocks too; Voxelhaven has a single wood type."
+    },
+    {
+      "match": "^(?:Oak|Spruce|Birch|Jungle|Acacia|Dark Oak|Mangrove|Cherry|Pale Oak|Poplar|Bamboo|Crimson|Warped) Planks$",
+      "item": "planks",
+      "note": "All plank species collapse onto Voxelhaven's single Planks block."
+    }
+  ],
+
+  "tags": {
+    "logs": {
+      "members": ["timber"],
+      "wikiAliases": ["Log", "Stripped Log", "Wood", "Stripped Wood", "Stem", "Hyphae"],
+      "note": "The wiki's `Any Log`/`Matching <species> Log` alias family."
+    },
+    "planks": {
+      "members": ["planks"],
+      "wikiAliases": ["Planks", "Overworld Planks"],
+      "note": "The wiki's `Any Planks` / `Matching Overworld Planks` alias family."
+    },
+    "stone_tier": {
+      "members": ["cobble"],
+      "wikiAliases": ["stone-tier block"],
+      "note": "The wiki's `Any stone-tier block`. Only cobblestone exists in Voxelhaven; blackstone and cobbled deepslate are deliberately not aliased onto it."
+    }
+  },
+
+  "fuels": {
+    "coal": 8,
+    "charcoal": 8,
+    "coal_block": 80,
+    "planks": 1.5,
+    "timber": 1.5,
+    "crafting_table": 1.5,
+    "stick": 0.5
+  },
+
+  "smeltingTimes": {
+    "default": 10
+  },
+
+  "voxelhavenRecipes": [
+    {
+      "id": "canopy_from_fiber",
+      "type": "shapeless",
+      "why": "Voxelhaven's original fiber-to-canopy recipe, kept from the flat crafting list. It is declared shapeless because weaving four tufts of fiber has no meaningful arrangement — any four slots do.",
+      "ingredients": [["fiber"], ["fiber"], ["fiber"], ["fiber"]],
+      "output": { "item": "canopy", "count": 1 }
+    },
+    {
+      "id": "turf_from_loam",
+      "why": "Vanilla has no recipe that returns a container, because its only container recipes (Cake, Honey Block) need milk, sugar, eggs, wheat or honey, none of which exist in Voxelhaven. This original recipe keeps the wiki's remainder semantics reachable in real play: a water bucket wets loam until turf grows on it, and the empty bucket comes back. Turf is otherwise unobtainable, since mining it yields loam the way vanilla grass does.",
+      "type": "shaped",
+      "pattern": [" # ", "#W#", " # "],
+      "key": { "#": ["loam"], "W": ["water_bucket"] },
+      "output": { "item": "turf", "count": 2 },
+      "remainder": { "W": { "item": "bucket", "count": 1 } },
+      "mirrored": true,
+      "matching": false
+    }
+  ],
+
+  "unsupported": [
+    {
+      "names": ["Raw Iron", "Raw Copper", "Raw Gold"],
+      "reason": "Voxelhaven ore blocks drop themselves and are smelted directly, the way its existing coal ore already behaves."
+    },
+    {
+      "names": ["Oak Slab", "Cobblestone Stairs", "Glass Pane", "Ladder", "Iron Bars", "Bed", "Carpet", "Door", "Trapdoor", "Fence", "Sign"],
+      "reason": "Voxelhaven's mesher only builds full cubes and crossed billboards, so non-cube block models do not exist."
+    },
+    {
+      "names": ["White Wool", "String", "Leather", "Bone Meal", "Paper", "Sugar", "Book", "Bookshelf", "Honey Bottle", "Honeycomb", "Slimeball", "Blaze Rod", "Gunpowder", "Feather", "Flint"],
+      "reason": "No mob drops, farming or fluid chains for these; Voxelhaven's only mob loot is Fiber."
+    },
+    {
+      "names": ["Redstone Dust", "Redstone Torch", "Piston", "Observer", "Dispenser", "Hopper", "Rail", "TNT", "Lever", "Target", "Daylight Detector", "Tripwire Hook"],
+      "reason": "There is no redstone simulation in Voxelhaven."
+    },
+    {
+      "names": ["Diamond", "Gold Ingot", "Copper Ingot", "Netherite Ingot", "Emerald", "Lapis Lazuli", "Quartz", "Amethyst Shard", "Resin Clump"],
+      "reason": "Only one metal line (iron) is implemented, which is what the brief asked for."
+    },
+    {
+      "names": ["White Dye", "Black Dye", "Red Dye", "Clay Ball", "Brick", "Terracotta", "Concrete Powder", "Glowstone Dust", "Prismarine Shard", "Nether Brick", "Purpur Block"],
+      "reason": "No dye, clay, nether or ocean content exists, so these whole material families are absent."
+    },
+    {
+      "names": ["Wooden Hoe", "Stone Hoe", "Iron Hoe", "Shears", "Fishing Rod", "Bow", "Arrow", "Shield", "Flint and Steel", "Carrot on a Stick", "Warped Fungus on a Stick", "Lead", "Name Tag", "Saddle", "Spyglass", "Brush", "Bundle", "Armor Stand", "Item Frame", "Painting", "Book and Quill", "Map", "Compass", "Clock", "Recovery Compass"],
+      "reason": "Utility and combat items Voxelhaven has no mechanics for: farming, fishing, ranged combat, pets, storage or cartography."
+    },
+    {
+      "names": ["Chest", "Barrel", "Shulker Box", "Ender Chest", "Crafter", "Stonecutter", "Smithing Table", "Cartography Table", "Fletching Table", "Loom", "Composter", "Beehive", "Anvil", "Cauldron", "Enchanting Table", "Brewing Stand", "Beacon", "Conduit", "Note Block", "Jukebox", "Lodestone", "Respawn Anchor", "Grindstone"],
+      "reason": "Workstation blocks with their own GUIs; Voxelhaven ships a crafting table and a furnace only."
+    },
+    {
+      "names": ["Glass Bottle", "Mushroom Stew", "Beetroot Soup", "Rabbit Stew", "Suspicious Stew", "Cake", "Cookie", "Bread", "Pumpkin Pie", "Golden Apple", "Golden Carrot", "Dried Kelp", "Hay Bale", "Sugar Cane"],
+      "reason": "No hunger, brewing or farming systems, so food and potion items have no effect to attach to."
+    },
+    {
+      "names": ["Blast Furnace", "Smoker", "Campfire", "Soul Campfire", "Soul Torch", "Soul Lantern", "Redstone Lamp", "Sea Lantern", "Jack o'Lantern", "Tinted Glass", "Note Block", "Mossy Cobblestone", "Mud Bricks", "Packed Mud", "Snow", "Coarse Dirt", "Chiseled Sandstone", "Chiseled Stone Bricks"],
+      "reason": "Further full-cube building blocks or second-tier stations that would add texture variants without adding a mechanic; excluded to keep the shipped item set purposeful."
+    }
+  ]
+}

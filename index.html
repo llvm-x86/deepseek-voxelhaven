@@ -84,12 +84,12 @@
         <div><kbd>Ctrl</kbd> / <kbd>C</kbd></div><div>Crouch</div>
         <div><kbd>Mouse</kbd></div><div>Look around</div>
         <div><kbd>Left click</kbd></div><div>Break block / attack</div>
-        <div><kbd>Right click</kbd></div><div>Place block</div>
+        <div><kbd>Right click</kbd></div><div>Place block / use (crafting table, furnace)</div>
         <div><kbd>Middle click</kbd></div><div>Pick block into hotbar</div>
         <div><kbd>Q</kbd></div><div>Drop one item</div>
         <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Wheel</kbd></div><div>Select hotbar slot</div>
-        <div><kbd>E</kbd> / <kbd>Tab</kbd></div><div>Inventory</div>
-        <div><kbd>R</kbd></div><div>Crafting</div>
+        <div><kbd>E</kbd> / <kbd>Tab</kbd></div><div>Inventory and 2×2 crafting grid</div>
+        <div><kbd>R</kbd></div><div>Recipe browser</div>
         <div><kbd>F3</kbd> / <kbd>`</kbd></div><div>Debug overlay</div>
         <div><kbd>M</kbd></div><div>Mute audio</div>
         <div><kbd>Esc</kbd></div><div>Pause menu</div>
@@ -205,7 +205,15 @@
     <div class="panel panel-wide">
       <div class="inventory-layout">
         <div class="inventory-main">
-          <h2>Inventory</h2>
+          <h2 id="inventory-title">Inventory</h2>
+          <div class="inventory-section">
+            <div class="section-label">Crafting</div>
+            <div class="craft-row">
+              <div id="craft-grid" class="slot-grid slot-grid-craft" role="group" aria-label="Crafting grid"></div>
+              <div class="craft-result-arrow" aria-hidden="true">➜</div>
+              <div id="craft-result" class="slot-grid" role="group" aria-label="Crafting result"></div>
+            </div>
+          </div>
           <div class="inventory-section">
             <div class="section-label">Backpack</div>
             <div id="inventory-grid" class="slot-grid"></div>
@@ -214,15 +222,42 @@
             <div class="section-label">Hotbar</div>
             <div id="inventory-hotbar" class="slot-grid slot-grid-hotbar"></div>
           </div>
-          <p class="muted small">Click a slot to pick a stack up, click another to place it. Shift-click to split.</p>
+          <p class="muted small" id="inventory-hint">
+            Click a slot to pick a stack up, click again to put it down, shift-click to split.
+          </p>
         </div>
         <div class="inventory-side">
-          <h2>Craft</h2>
+          <h2>Recipes</h2>
           <div id="craft-list" class="craft-list"></div>
         </div>
       </div>
       <div class="button-row">
         <button id="btn-inventory-close" class="btn btn-primary" type="button">Close (E)</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-furnace" class="screen screen-dim is-hidden">
+    <div class="panel">
+      <h2>Furnace</h2>
+      <div class="furnace-layout">
+        <div id="furnace-slots" class="furnace-slots"></div>
+        <div class="furnace-gauges">
+          <div class="furnace-flame-track" role="img" aria-label="Fuel remaining">
+            <div id="furnace-flame" class="furnace-flame"></div>
+          </div>
+          <div id="furnace-arrow" class="furnace-progress" role="img" aria-label="Smelting progress">
+            <i></i>
+          </div>
+          <p class="muted small" id="furnace-status">—</p>
+        </div>
+      </div>
+      <p class="muted small">
+        One unit of fuel burns for ten seconds and smelts one item; coal and charcoal are worth eight.
+        The furnace keeps working while the screen is closed.
+      </p>
+      <div class="button-row">
+        <button id="btn-furnace-close" class="btn btn-primary" type="button">Close (Esc)</button>
       </div>
     </div>
   </section>
