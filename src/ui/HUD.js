@@ -74,6 +74,7 @@ export class HUD {
     this.heldNameTimer = 0;
     this.damageTimer = 0;
     this.lastSelectedSlot = -1;
+    this.lastInventoryRevision = -1;
     this.lastHealth = -1;
     this.lastBreath = -1;
     this.underwater = false;
@@ -177,6 +178,14 @@ export class HUD {
       this.lastSelectedSlot = player.selectedSlot;
       this.refreshHotbar(player);
     }
+    // Poll the inventory revision as well as listening for refresh events.
+    // Placing a block spends a stack without announcing anything, which used to
+    // leave the hotbar showing an item the player no longer had until they
+    // happened to switch slots. Checking a counter each frame makes every
+    // mutation visible, whoever made it.
+    else if (player.inventory && player.inventory.revision !== this.lastInventoryRevision) {
+      this.refreshHotbar(player);
+    }
     if (player.health !== this.lastHealth) {
       this.lastHealth = player.health;
       this.refreshHealth(player.health);
@@ -209,6 +218,7 @@ export class HUD {
 
   /** Rebuild the hotbar icons and counts from the player's inventory. */
   refreshHotbar(player) {
+    this.lastInventoryRevision = player.inventory ? player.inventory.revision : 0;
     for (let i = 0; i < this.slotElements.length; i++) {
       const element = this.slotElements[i];
       const stack = player.inventory.get(i);

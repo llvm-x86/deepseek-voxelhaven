@@ -22,11 +22,26 @@ export class Inventory {
     this.size = size;
     /** @type {Array<{item:string, count:number, durability?:number}|null>} */
     this.slots = new Array(size).fill(null);
+    /**
+     * Bumped by every mutation. The HUD polls this instead of relying on each
+     * caller to announce that it changed something: placing a block, eating,
+     * taking from a furnace and dropping an item all mutate the inventory from
+     * different subsystems, and a missed announcement used to leave the hotbar
+     * showing a stack that had already been spent.
+     * @type {number}
+     */
+    this.revision = 0;
+  }
+
+  /** Record that the contents changed. */
+  _changed() {
+    this.revision++;
   }
 
   /** Empty every slot. */
   clear() {
     this.slots.fill(null);
+    this._changed();
   }
 
   /** Slot contents, or null. */
@@ -50,10 +65,12 @@ export class Inventory {
     if (index < 0 || index >= this.size) return;
     if (stack && (stack.count <= 0 || !ItemRegistry.isValid(stack.item) || stack.item === EMPTY_ITEM)) {
       this.slots[index] = null;
+      this._changed();
       return;
     }
     if (!stack) {
       this.slots[index] = null;
+      this._changed();
       return;
     }
     const maxStack = ItemRegistry.maxStack(stack.item);
@@ -64,6 +81,7 @@ export class Inventory {
       entry.durability = Math.max(0, Math.min(maxDurability, Math.round(value)));
     }
     this.slots[index] = entry;
+    this._changed();
   }
 
   /**
@@ -103,6 +121,7 @@ export class Inventory {
       this.slots[i] = entry;
       remaining -= moved;
     }
+    if (remaining !== count) this._changed();
     return remaining;
   }
 
@@ -144,6 +163,7 @@ export class Inventory {
     const removed = Math.min(slot.count, count);
     slot.count -= removed;
     if (slot.count <= 0) this.slots[index] = null;
+    if (removed > 0) this._changed();
     return removed;
   }
 
@@ -161,6 +181,7 @@ export class Inventory {
       remaining -= taken;
       if (slot.count <= 0) this.slots[i] = null;
     }
+    if (remaining !== count) this._changed();
     return count - remaining;
   }
 
@@ -197,6 +218,7 @@ export class Inventory {
     if (!target) {
       this.slots[to] = source;
       this.slots[from] = null;
+      this._changed();
       return true;
     }
     if (target.item === source.item) {
@@ -207,11 +229,13 @@ export class Inventory {
       target.count += moved;
       source.count -= moved;
       if (source.count <= 0) this.slots[from] = null;
+      this._changed();
       return true;
     }
     // Different items: swap.
     this.slots[to] = source;
     this.slots[from] = target;
+    this._changed();
     return true;
   }
 
@@ -223,6 +247,7 @@ export class Inventory {
     if (half <= 0) return false;
     this.slots[to] = { item: source.item, count: half };
     source.count -= half;
+    this._changed();
     return true;
   }
 
@@ -275,6 +300,7 @@ export class Inventory {
       this.slots[index] = stack;
       restored++;
     }
+    this._changed();
     return { restored, skipped };
   }
 }

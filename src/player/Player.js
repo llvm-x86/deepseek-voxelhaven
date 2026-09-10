@@ -181,6 +181,9 @@ export class Player {
       return true;
     }
     stack.durability = next;
+    // Mutated in place rather than through inventory.set, so the revision has to
+    // be bumped by hand or the HUD would not notice the tool wearing down.
+    this.inventory._changed();
     this.bus.emit('toolDamaged', { item: stack.item, durability: next, max });
     return false;
   }

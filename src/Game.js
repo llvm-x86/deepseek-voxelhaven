@@ -1101,7 +1101,14 @@ export class Game {
     this._heldSwing += ((using ? 1 : 0) - this._heldSwing) * Math.min(1, dt * 9);
     const swing = Math.sin(this._heldSwing * Math.PI) * 0.35;
 
-    this.appendHeldArm(mesh, swing);
+    // A gentle bob while walking. It moves the WHOLE hand — fist, forearm and
+    // item share one offset — because moving only the item separates it from
+    // the fist it is supposed to be gripped by. At this distance 0.006 view
+    // units is already ~4 px on screen, which was visible as the item sliding
+    // against a stationary arm.
+    const bob = Math.sin(this.player.walkPhase * 2) * 0.006 * (this.player.onGround ? 1 : 0);
+
+    this.appendHeldArm(mesh, swing, bob);
 
     const stack = this.player.heldStack();
     if (!stack) return { mesh, projection: this.camera.projection };
@@ -1114,19 +1121,14 @@ export class Game {
     const tileU = this.renderer.atlas.tileU(tileName);
     const tileV = this.renderer.atlas.tileV(tileName);
 
-    // View-space placement: the lower-right corner, so the item is cropped by
-    // the screen edge the way a held object is. These distances are chosen from
-    // the projection (apparent size is size / (|z| * 2 * tan(fov/2))), which
-    // puts the item's centre near (859, 204) px on a 1280x720 view.
-    const bob = Math.sin(this.player.walkPhase * 2) * 0.006 * (this.player.onGround ? 1 : 0);
-    const x = 0.45 - swing * 0.05;
-    const y = -0.34 + bob - swing * 0.08;
-    const z = -0.95;
-    const scale = 0.13;
-
-    // Yawed so the player sees two faces of the cube rather than a flat side.
-    composeViewMatrix(this._heldItemMatrix, x, y, z,
-      0.62 + swing * 0.55, -0.30 + swing * 0.5, 0.1, scale, scale, scale);
+    // Same swing delta and bob the arm uses, so the two never separate.
+    const part = HELD_HAND.item;
+    composeViewMatrix(this._heldItemMatrix,
+      part.x + swing * HELD_HAND.swing.x,
+      part.y + swing * HELD_HAND.swing.y + bob,
+      part.z,
+      part.yaw, part.pitch, part.roll,
+      part.size, part.size, part.size);
 
     const tiles = this._heldItemTiles;
     for (let i = 0; i < 6; i++) { tiles[i].u = tileU; tiles[i].v = tileV; }
@@ -1138,29 +1140,37 @@ export class Game {
   /**
    * Append the forearm and fist to the held-item mesh, in view space.
    *
-   * Built from two boxes: a sleeve running down and out of frame, and a fist
-   * at the top of it that the held item sits against. The pitch tilts the far
-   * end of the arm away from the camera so it foreshortens naturally instead
-   * of looking like a plank laid across the screen.
+   * Drawn before the item so the item wins any depth tie at the wrist. Both
+   * boxes are moved by the same rigid swing delta and the same walk bob — see
+   * the notes on `HELD_HAND.swing` and on the bob in `buildHeldItem` for why
+   * these are translations applied to every part rather than per-part motion.
    * @param {import('./render/DynamicMesh.js').DynamicMesh} mesh
    * @param {number} swing current swing amount, 0..0.35
+   * @param {number} bob vertical walk bob, in view units
    */
-  appendHeldArm(mesh, swing) {
+  appendHeldArm(mesh, swing, bob = 0) {
     const atlas = this.renderer.atlas;
     const tiles = this._heldArmTiles;
     const armU = atlas.tileU('hand');
     const armV = atlas.tileV('hand');
     for (let i = 0; i < 6; i++) { tiles[i].u = armU; tiles[i].v = armV; }
 
-    const spec = HELD_ARM;
-    for (let i = 0; i < spec.length; i++) {
-      const part = spec[i];
-      composeViewMatrix(this._heldArmMatrix,
-        part.x - swing * 0.05, part.y - swing * 0.08, part.z,
-        part.yaw, part.pitch, part.roll,
-        part.sx, part.sy, part.sz);
-      mesh.addBoxMulti(this._heldArmMatrix, tiles, 1.0, 0.55, 1.0);
-    }
+    const dx = swing * HELD_HAND.swing.x;
+    const dy = swing * HELD_HAND.swing.y + bob;
+
+    const forearm = HELD_HAND.forearm;
+    composeViewMatrix(this._heldArmMatrix,
+      forearm.x + dx, forearm.y + dy, forearm.z,
+      forearm.yaw, forearm.pitch, forearm.roll,
+      forearm.sizeXZ, forearm.sizeY, forearm.sizeXZ);
+    mesh.addBoxMulti(this._heldArmMatrix, tiles, 1.0, 0.55, 1.0);
+
+    const fist = HELD_HAND.fist;
+    composeViewMatrix(this._heldArmMatrix,
+      fist.x + dx, fist.y + dy, fist.z,
+      fist.yaw, fist.pitch, fist.roll,
+      fist.size, fist.size, fist.size);
+    mesh.addBoxMulti(this._heldArmMatrix, tiles, 1.0, 0.55, 1.0);
   }
 
   // =========================================================================
@@ -1280,21 +1290,46 @@ export class Game {
 const UNDERWATER_FOG = new Float32Array([0.10, 0.28, 0.52]);
 
 /**
- * View-space boxes making up the first-person arm, drawn under the held item.
+ * View-space geometry of the first-person hand.
  *
- * The arm exists so the held item reads as gripped rather than floating. It is
- * deliberately a separate, non-overlapping run of boxes: an upper arm running
- * down and out of the bottom-right of the screen, and a fist at its top. See
- * the placement note in buildHeldItem for how the depths were chosen.
+ * View space is x right, y up, forward -Z, and the screen edges are at about
+ * ±0.66 vertically and ±1.17 horizontally at these depths. Sizes look small but
+ * are not: apparent size is `size / |z| / (2 tan(fov/2))`, so the 0.20-unit fist
+ * at z = -0.85 already covers 27% of the viewport height.
+ *
+ * The corner anchor is the whole point. The hand has to be cropped by the right
+ * and bottom edges, so it reads as attached to the camera; an earlier version
+ * floated entirely inside the frame, ~285 px clear of the right edge and 71 px
+ * clear of the bottom, which is what "not on the bottom-right corner at all"
+ * described. Both the fist and the forearm therefore extend past the frame.
+ *
+ * These numbers are not hand-tuned. `test/probe-hand-variants.mjs` sweeps a grid
+ * of layouts and scores each against: cropped by both edges, forearm leaving the
+ * frame rather than ending in mid-air, no corner crossing the 0.06 near plane,
+ * fist near 27% of the viewport height, and the fist and forearm staying rigid
+ * through the swing. This layout is the highest-scoring one.
  */
-const HELD_ARM = [
-  // Upper arm: angled down-right, most of it off screen. It must stay clear of
-  // the near plane — an earlier placement put its near end at w = 0.28, which
-  // blew it up to ~900 px wide and clipped it away entirely.
-  { x: 0.60, y: -0.62, z: -1.25, yaw: 0.20, pitch: 0.30, roll: 0.10, sx: 0.13, sy: 0.40, sz: 0.13 },
-  // Fist: tucked directly under the item so the two read as gripped.
-  { x: 0.50, y: -0.32, z: -1.05, yaw: 0.30, pitch: -0.20, roll: 0.12, sx: 0.13, sy: 0.16, sz: 0.13 }
-];
+const HELD_HAND = {
+  // The fist: the chunk of hand the player actually sees.
+  fist: { x: 0.966, y: -0.469, z: -0.85, yaw: 0.62, pitch: -0.30, roll: 0.10, size: 0.20 },
+  // The forearm, running down and back out of the bottom-right corner. `sizeY`
+  // is generous so it is cropped by the edge instead of stopping in mid-air.
+  forearm: {
+    x: 1.056, y: -0.989, z: -0.95, yaw: 0.42, pitch: 0.34, roll: 0.10,
+    sizeXZ: 0.18, sizeY: 1.10
+  },
+  // The held item, sitting on top of the fist the way a block does in vanilla —
+  // the same visual weight as the fist itself, not a small token beside it.
+  item: { x: 0.850, y: -0.400, z: -0.80, yaw: 0.62, pitch: -0.30, roll: 0.10, size: 0.20 },
+  /**
+   * The swing is a rigid translation of the whole hand, not a per-part
+   * rotation. Rotating each box about a shared shoulder pivot looks reasonable
+   * but slides the fist and forearm apart — a rotation moves boxes at different
+   * radii by different amounts — which is why the swing moves every part by the
+   * same delta here.
+   */
+  swing: { x: -0.036, y: -0.100 }
+};
 
 /**
  * Compose a view-space (not world-space) transform for the held item.
