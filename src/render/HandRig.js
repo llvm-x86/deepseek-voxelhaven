@@ -106,39 +106,28 @@ const SHOULDER_X = 5.6;
 export const ARM_MODEL_TO_VIEW = 1 / 16;
 
 /**
- * Overall size of the rig, applied last.
+ * Overall size of the rig, and where it sits, both applied last.
  *
- * Vanilla's placement is tuned for its own projection, and ours is not the
- * same: a 72-degree vertical fov on a 16:9 frame is wider than the original's,
- * so the same rig at the same distance subtends a smaller angle. Reproducing
- * the numbers verbatim therefore gives the right *pose* at the wrong *size* —
- * measured, the whole arm landed at y = 861..2107 on a 720-pixel frame, i.e.
- * entirely below the bottom edge.
+ * Vanilla's placement is tuned for its own projection and ours differs — a
+ * 72-degree vertical fov on a 16:9 frame is wider than the original's, so the
+ * same rig at the same distance subtends a smaller angle. Taken verbatim the
+ * pose is right and the placement is not: measured, the whole arm landed at
+ * y = 861..2107 on a 720-pixel frame, entirely below the bottom edge.
  *
- * The pose is what "follows the Minecraft style" means, so the pose is kept
- * exactly and this one factor is solved for instead. 0.4 puts the visible part
- * of the arm at 0.10..0.36 view units from the camera, which is where the
- * hand-placed version measured well, and it is what `probe-hand` checks the
- * silhouette against.
+ * The POSE is what "follows the Minecraft style" means, so the pose is kept
+ * exactly as transcribed and these two placement values are solved for instead,
+ * against the one thing that can be measured from a reference frame: where the
+ * visible arm appears and how big it is. The targets are a visible hand about
+ * 160 x 220 px, in the bottom-right corner, cropped by the right and bottom
+ * edges — read off a vanilla first-person screenshot scaled to 1280x720.
+ *
+ * `test/unit-math.mjs` asserts those bounds, so a future re-tune that doubles
+ * the arm or shrinks it to a speck fails rather than shipping.
  */
-export const RIG_SCALE = 1.0;
+export const RIG_SCALE = 1;
 
-/**
- * Where the rig sits in view space, applied after the model->view conversion.
- *
- * Vanilla's own base translation cannot place this arm for us, and the reason
- * is measurable rather than mysterious: the rig comes out of the original's
- * stack at 0.04..0.13 view units from the camera, i.e. against the near plane,
- * and centred vertically. Its pose — which is the part that reads as
- * "Minecraft" — is exactly right; only its placement is wrong, because the
- * original's projection is not ours.
- *
- * So the pose is kept verbatim and these two numbers are solved for instead:
- * `test/probe-hand` reports the silhouette they have to produce, and
- * `RIG_PLACEMENT`/`RIG_SCALE` are the values that put the visible arm in the
- * bottom-right corner, cropped by both edges, at a readable size.
- */
-export const RIG_PLACEMENT = [1.121, -0.176, -0.83];
+/** View-space offset for the rig, applied after the model->view conversion. */
+export const RIG_PLACEMENT = [1.36, -0.2, -1];
 
 /** Model pixels per view unit — the stack's final `scale`. */
 export const MODEL_PIXELS_PER_UNIT = 16;
